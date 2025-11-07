@@ -30,6 +30,45 @@ function formatLocation(issue: ReviewIssue): string {
   return `${issue.location.file}:${issue.location.line}`;
 }
 
+function DiffBlock({
+  diff,
+  Box,
+  Text,
+}: {
+  diff: string;
+  Box: InkModule["Box"];
+  Text: InkModule["Text"];
+}): JSX.Element {
+  const lines = diff
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff")) {
+        return { line, color: "gray" as const };
+      }
+      if (line.startsWith("@@")) {
+        return { line, color: "magenta" as const };
+      }
+      if (line.startsWith("+")) {
+        return { line, color: "green" as const };
+      }
+      if (line.startsWith("-")) {
+        return { line, color: "red" as const };
+      }
+      return { line, color: "gray" as const };
+    });
+
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      {lines.map((entry, idx) => (
+        <Text key={idx} color={entry.color}>
+          {entry.line}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
 export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) => {
   const { Box, Text, useApp } = ink;
   const { exit } = useApp();
@@ -56,19 +95,41 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) =>
             <Text color="green">No issues found! 🎉</Text>
           </Box>
         ) : (
-          groupedIssues.map(({ severity, issue }) => (
-            <Box
-              key={`${issue.location.file}:${issue.location.line}:${issue.title}`}
-              flexDirection="column"
-              marginBottom={1}
-            >
-              <Text color={severityColor[severity]}>{truncate(issue.title, 90)}</Text>
-              <Text color="gray">{truncate(formatLocation(issue), 90)}</Text>
-              {issue.description && issue.description.trim().length > 0 && (
-                <Text color="white">{truncate(issue.description.trim(), 120)}</Text>
-              )}
-            </Box>
-          ))
+          groupedIssues.map(({ severity, issue }) => {
+            const suggestion =
+              typeof issue.suggestion !== "string" && issue.suggestion
+                ? issue.suggestion
+                : undefined;
+            const diffContent = suggestion
+              ? suggestion.diff?.trim() && suggestion.diff.trim().length > 0
+                ? suggestion.diff.trim()
+                : suggestion.code
+                ? suggestion.code
+                    .split("\n")
+                    .map((line) => `+ ${line}`)
+                    .join("\n")
+                : undefined
+              : undefined;
+
+            return (
+              <Box
+                key={`${issue.location.file}:${issue.location.line}:${issue.title}`}
+                flexDirection="column"
+                marginBottom={1}
+                paddingX={1}
+                paddingY={1}
+                borderStyle="round"
+                borderColor={severityColor[severity]}
+              >
+                <Text color={severityColor[severity]}>{issue.title}</Text>
+                <Text color="gray">{formatLocation(issue)}</Text>
+                {issue.description && issue.description.trim().length > 0 && (
+                  <Text color="white">{issue.description.trim()}</Text>
+                )}
+                {diffContent && <DiffBlock diff={diffContent} Box={Box} Text={Text} />}
+              </Box>
+            );
+          })
         )}
       </Box>
     </Box>

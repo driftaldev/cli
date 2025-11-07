@@ -4,11 +4,12 @@ import React from "react";
 import ReviewSummary from "../ui/review/ReviewSummary.js";
 import type { ReviewResults } from "../core/review/issue.js";
 
-let inkModule: typeof import("ink") | null = null;
+let inkModule: any | null = null;
 
 async function getInk() {
   if (!inkModule) {
     process.env.DEV = "false";
+    // @ts-ignore Ink ESM types are not resolved under current moduleResolution, runtime import is valid
     inkModule = await import("ink");
   }
   return inkModule;
@@ -41,6 +42,16 @@ function buildDummyResults(): ReviewResults {
         },
         suggestion: {
           description: "Abort early when profile is unavailable",
+          diff: [
+            "@@",
+            "- const profile = cache.get(userId)",
+            "- return profile.email;",
+            "+ const profile = cache.get(userId);",
+            "+ if (!profile) {",
+            "+   return { status: 404, body: { error: 'Profile not found' } };",
+            "+ }",
+            "+ return profile.email;",
+          ].join("\n"),
           code: "if (!profile) {\n  return { status: 404, body: { error: 'Profile not found' } };\n}\n",
         },
         rationale:
@@ -61,6 +72,11 @@ function buildDummyResults(): ReviewResults {
         },
         suggestion: {
           description: "Switch to parameterized query",
+          diff: [
+            "@@",
+            '- const result = await db.query("SELECT * FROM teams WHERE id = " + teamId);',
+            "+ const result = await db.query('SELECT * FROM teams WHERE id = $1', [teamId]);",
+          ].join("\n"),
           code: "const result = await db.query('SELECT * FROM teams WHERE id = $1', [teamId]);",
         },
         rationale:
@@ -79,6 +95,15 @@ function buildDummyResults(): ReviewResults {
           file: "src/cache/user-cache.ts",
           line: 118,
         },
+        suggestion: {
+          description: "Restrict invalidation scope to the affected tenant",
+          diff: [
+            "@@",
+            '- await cache.invalidate("tenant-");',
+            "+ await cache.invalidate(`tenant-${tenantId}`);",
+          ].join("\n"),
+          code: "await cache.invalidate(`tenant-${tenantId}`);",
+        },
         rationale:
           "Synthetic benchmarks show a 35% latency spike after the blanket invalidation releases.",
         tags: ["cache", "scalability"],
@@ -94,6 +119,15 @@ function buildDummyResults(): ReviewResults {
         location: {
           file: "src/infra/deploy.ts",
           line: 52,
+        },
+        suggestion: {
+          description: "Promote health check log to info",
+          diff: [
+            "@@",
+            "- logger.debug('deployment health check passed');",
+            "+ logger.info('deployment health check passed');",
+          ].join("\n"),
+          code: "logger.info('deployment health check passed');",
         },
         rationale:
           "On-call runbooks expect info-level logs to appear in Grafana panels during incidents.",
@@ -119,10 +153,10 @@ export function registerTestInkCommand(program: Command): void {
       const results: ReviewResults = buildDummyResults();
 
       console.log("\nRendering dummy review summary...\n");
-      const app = ink.render(React.createElement(ReviewSummary, { results, ink }));
+      const app = ink.render(
+        React.createElement(ReviewSummary, { results, ink })
+      );
       await app.waitUntilExit();
       console.log("\nDone.\n");
     });
 }
-
-

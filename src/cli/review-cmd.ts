@@ -19,11 +19,12 @@ import type { LLMConfig, ReviewConfig } from "../config/schema.js";
 import type { ReviewIssue } from "../core/review/issue.js";
 import ReviewSummary from "../ui/review/ReviewSummary.js";
 
-let inkModule: typeof import("ink") | null = null;
+let inkModule: any | null = null;
 
 async function getInk() {
   if (!inkModule) {
     process.env.DEV = "false";
+    // @ts-ignore Ink ESM types are not resolved under current moduleResolution, runtime import is valid
     inkModule = await import("ink");
   }
   return inkModule;
@@ -41,6 +42,8 @@ async function applyFix(
     return false;
   }
 
+  const suggestion = issue.suggestion;
+
   const filePath = path.join(repoPath, issue.location.file);
 
   try {
@@ -56,10 +59,10 @@ async function applyFix(
       const endLine = issue.location.endLine - 1;
       const numLinesToReplace = endLine - startLine + 1;
 
-      lines.splice(startLine, numLinesToReplace, issue.suggestion.code);
+      lines.splice(startLine, numLinesToReplace, suggestion.code ?? "");
     } else {
       // Just replace the single line
-      lines[issue.location.line - 1] = issue.suggestion.code;
+      lines[issue.location.line - 1] = suggestion.code ?? "";
     }
 
     const newContent = lines.join("\n");
@@ -107,21 +110,21 @@ async function interactiveFixReview(
   );
 
   for (const issue of fixableIssues) {
+    const suggestion = issue.suggestion;
+
+    if (!suggestion || typeof suggestion === "string") {
+      continue;
+    }
+
     console.log(chalk.cyan(`\n${issue.location.file}:${issue.location.line}`));
     console.log(chalk.bold(`  ${issue.title}`));
     console.log(chalk.gray(`  ${issue.description}\n`));
 
-    const suggestionText =
-      typeof issue.suggestion === "string"
-        ? issue.suggestion
-        : issue.suggestion.description;
-    console.log(chalk.green(`  Suggested fix: ${suggestionText}`));
+    console.log(chalk.green(`  Suggested fix: ${suggestion.description}`));
 
-    if (typeof issue.suggestion !== "string" && issue.suggestion.code) {
+    if (suggestion.code) {
       console.log(chalk.gray("\n  Proposed code:"));
-      console.log(
-        chalk.gray("  " + issue.suggestion.code.split("\n").join("\n  "))
-      );
+      console.log(chalk.gray("  " + suggestion.code.split("\n").join("\n  ")));
     }
 
     const { action } = await inquirer.prompt([

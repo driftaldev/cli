@@ -1036,5 +1036,440 @@
       "tags": []
     },
     "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "4d987fc1-34a9-44b7-ac85-812f878f92e9",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used in spawning a child process, which can lead to command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize and validate all user inputs used in command execution or use safer alternatives like execFile.",
+        "code": "this.process = spawn('python3', ['-m', 'uvicorn', 'app.main:app', '--port', '8765'], { cwd, detached: true, stdio: 'ignore' });"
+      },
+      "rationale": "Using unsanitized user input in command execution can allow attackers to execute arbitrary commands on the host system.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "d388b663-7d5f-4f2d-860d-e652e2d36642",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Potential unhandled promise rejection in daemon command action",
+      "description": "The async action handler in the 'daemon' command does not handle promise rejections, which could lead to unhandled promise rejections if the start, stop, or status methods throw an error.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 169
+      },
+      "problematicPath": "If manager.start(), manager.stop(), or manager.status() throw an error, it is not caught.",
+      "edgeCases": [
+        "Network issues during start/stop/status",
+        "Configuration errors"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around the async operations to handle errors gracefully.",
+        "code": "try {\n  await manager.start();\n} catch (error) {\n  logger.error('Failed to start daemon:', error);\n}"
+      },
+      "rationale": "Handling errors in asynchronous operations prevents unhandled promise rejections and improves the robustness of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "3c013292-cfb3-477d-a2f7-1487f82b36ec",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Sensitive information such as API keys and environment variables are logged, which can lead to information disclosure if logs are improperly secured or accessed.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "cwe": "CWE-532",
+      "suggestion": {
+        "description": "Avoid logging sensitive information directly. Use obfuscation or tokenization if logging is necessary.",
+        "code": "logger.warn(`Cloud hosting enabled but environment variable is not set. Requests may fail.`);"
+      },
+      "rationale": "Logging sensitive information can expose it to unauthorized parties, especially if log management practices are not robust.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "114fd013-862f-472c-bf2a-79de7080042c",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Insecure Default Environment Variable Usage",
+      "description": "The application uses a default environment variable for Python execution, which could be insecure if the environment is not properly configured.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 61
+      },
+      "cwe": "CWE-807",
+      "suggestion": {
+        "description": "Ensure that the default environment variable is secure or provide a secure method to specify the Python interpreter.",
+        "code": "const python = process.env.SCOUT_PYTHON || 'python3';"
+      },
+      "rationale": "Relying on default environment variables without validation can lead to security misconfigurations.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0872ee38-7f3d-4119-b2e7-ef15207f944f",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated loading of configuration in multiple methods",
+      "description": "The configuration is loaded repeatedly in start, stop, and status methods, which could be inefficient if the configuration loading is heavy.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 10
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load the configuration once in the constructor or lazily and reuse it across methods.",
+        "code": "class DaemonManager {\n  private config: ConfigType;\n  constructor() {\n    this.config = loadConfig();\n  }\n}"
+      },
+      "alternative": "Use a singleton pattern for configuration management",
+      "rationale": "Avoids unnecessary I/O operations and CPU cycles by reusing the loaded configuration.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "403ab4e9-cd3e-4883-be40-ab8dfcf0ff76",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Excessive logging impacting performance",
+      "description": "Extensive debug logging in every method could degrade performance, especially under heavy load or when logs are written to a slow storage.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 10
+      },
+      "complexity": "O(n) where n is the number of log entries",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Implement log level control to reduce the volume of logged information in production environments.",
+        "code": "if (process.env.NODE_ENV === 'production') {\n  logger.setLevel('info');\n}"
+      },
+      "alternative": "Use asynchronous logging or external logging services",
+      "rationale": "Reduces the I/O overhead and potential blocking operations caused by synchronous logging.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "13179b1d-673c-42f8-86dd-c86db6c8759c",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejections",
+      "description": "The asynchronous operations in the daemon command actions do not handle exceptions, which could lead to unhandled promise rejections and potential crashes or memory leaks.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 180
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Add try-catch blocks around asynchronous operations to handle potential errors gracefully.",
+        "code": "try {\n  await manager.start();\n} catch (error) {\n  logger.error('Failed to start daemon:', error);\n}"
+      },
+      "alternative": "Use centralized error handling middleware for asynchronous operations",
+      "rationale": "Improves reliability and maintainability by handling errors and preventing application crashes.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "94aa7e55-2464-44d5-9395-8847eabdf1aa",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Incorrect conditional logic for cloudAuth.missingIndexerEnvVar and cloudAuth.missingRedisEnvVar checks",
+      "description": "The condition checks for missing environment variables do not correctly account for the presence of an API key in the configuration, leading to potentially misleading warnings.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 28
+      },
+      "problematicPath": "The condition 'cloudAuth.missingIndexerEnvVar && !config.cloud?.api_key' should be 'cloudAuth.missingIndexerEnvVar && config.cloud?.api_key'",
+      "edgeCases": [
+        "API key is configured but environment variables are missing"
+      ],
+      "suggestion": {
+        "description": "Correct the conditional logic to accurately reflect the intended checks.",
+        "code": "if (cloudAuth.missingIndexerEnvVar && config.cloud?.api_key) {\n  logger.warn(`Cloud hosting enabled but environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`);\n}"
+      },
+      "rationale": "Correcting the logic ensures that warnings are only issued when relevant, avoiding confusion.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "828333b1-5e14-451c-80ad-0367650771c6",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary repeated environment variable checks",
+      "description": "The environment variable for Python executable is checked every time the daemon is started, which is unnecessary if the environment does not change.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 50
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Cache the Python executable path after the first check to avoid repeated environment variable lookups.",
+        "code": "private pythonExecutable: string;\n\nconstructor() {\n  this.pythonExecutable = process.env.SCOUT_PYTHON ?? 'python3';\n}"
+      },
+      "alternative": "Check and store the executable path once during initialization",
+      "rationale": "Minimizes the overhead from accessing environment variables multiple times.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "2cc51104-90e9-49d7-bf2e-2a64e26e3896",
+    "timestamp": 1762501959217,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Inconsistent error logging for unknown daemon action",
+      "description": "The error message for an unknown daemon action is logged twice with different messages, which could be confusing for debugging.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 179
+      },
+      "problematicPath": "When an unknown action is received, two error logs are generated.",
+      "edgeCases": [
+        "Invalid command input"
+      ],
+      "suggestion": {
+        "description": "Consolidate the error messages into a single, clear log entry.",
+        "code": "logger.error(`Unknown daemon action received: ${action}. Use start, stop, or status.`);"
+      },
+      "rationale": "A single, clear error message improves the readability of logs and aids in troubleshooting.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "120d7404-d0da-408a-834d-cfd944517918",
+    "timestamp": 1762502500483,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-supplied data",
+      "description": "The method 'get' in RedisCache class deserializes data from Redis without validating the content, which could lead to attacks such as code execution if the data is tampered.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement input validation or sanitization before deserializing data.",
+        "code": "if (isValidJSON(value)) { return JSON.parse(value) as T; } else { throw new Error('Invalid data'); }"
+      },
+      "rationale": "Deserializing untrusted data without validation can lead to security vulnerabilities such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b5f975b9-e01c-4c6a-9712-231fea62fb7a",
+    "timestamp": 1762502500483,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficient JSON serialization/deserialization",
+      "description": "The methods for setting and getting cache entries involve JSON serialization and deserialization, which can be computationally expensive and may lead to performance issues with large objects.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31,
+        "endLine": 39
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Consider using more efficient serialization techniques or libraries, especially for large or complex objects.",
+        "code": "const value = msgpack.encode(value); // Using MessagePack or similar library\nawait this.client.set(key, value, 'EX', ttl);"
+      },
+      "alternative": "Use binary serialization formats like MessagePack",
+      "rationale": "JSON.parse and JSON.stringify can be slow for large data structures, impacting cache operation speeds.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "1675298e-11e6-40bf-8567-d60c322c0e03",
+    "timestamp": 1762502500483,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential JSON.parse failure not handled",
+      "description": "The method JSON.parse is used without handling possible exceptions that can occur when parsing invalid JSON.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "If the value retrieved from Redis is not valid JSON, JSON.parse will throw an error.",
+      "edgeCases": [
+        "Invalid JSON stored in Redis"
+      ],
+      "suggestion": {
+        "description": "Wrap JSON.parse in a try-catch block to handle potential errors gracefully.",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (error) {\n  console.error('Failed to parse JSON:', error);\n  return undefined;\n}"
+      },
+      "rationale": "Handling JSON.parse errors prevents the application from crashing due to unexpected data formats in the cache.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ac54bfb9-742a-49f3-85d7-18779874d676",
+    "timestamp": 1762502500483,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No error handling in connect, disconnect, set, and delete methods",
+      "description": "The methods for connecting, disconnecting, setting, and deleting cache entries do not handle errors that might occur during Redis operations.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 19
+      },
+      "problematicPath": "Errors in Redis operations can lead to unhandled promise rejections.",
+      "edgeCases": [
+        "Redis server is down",
+        "Network issues",
+        "Permission errors"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around Redis operations to handle errors and possibly retry or log them.",
+        "code": "try {\n  await this.client.connect();\n} catch (error) {\n  console.error('Failed to connect to Redis:', error);\n  throw error;\n}"
+      },
+      "rationale": "Proper error handling ensures that the application can gracefully handle failures in external dependencies like Redis.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "500f403c-5664-4abd-b753-0c80206e1bfa",
+    "timestamp": 1762502500483,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Redundant check for 'ready' status in connect method",
+      "description": "The connect method checks if the client status is 'ready' or 'connecting' and returns early, which is redundant since ioredis handles connection pooling and reconnections internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 19
+      },
+      "problematicPath": "Checking for 'ready' or 'connecting' status before calling connect.",
+      "edgeCases": [
+        "Client is already connected or connecting"
+      ],
+      "suggestion": {
+        "description": "Remove the redundant status check to simplify the code.",
+        "code": "await this.client.connect();"
+      },
+      "rationale": "Removing unnecessary code simplifies the implementation and reduces the potential for errors.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "bcd7e64e-13dc-4a8c-b342-6b1448ab0f97",
+    "timestamp": 1762502500483,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Redundant connection status checks",
+      "description": "The connect and disconnect methods include checks for the client's connection status, which might be redundant if the Redis client library handles reconnections or disconnections internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 17,
+        "endLine": 25
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove the status checks if the Redis client library already handles these scenarios efficiently.",
+        "code": "await this.client.connect();\nawait this.client.quit();"
+      },
+      "alternative": "Rely on the Redis client's internal mechanisms for connection management",
+      "rationale": "Extra condition checks can add unnecessary complexity and minor performance overhead if the underlying library already manages connection states effectively.",
+      "confidence": 0.7,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
   }
 ]

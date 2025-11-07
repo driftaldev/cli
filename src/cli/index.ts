@@ -23,6 +23,7 @@ import { registerLoginCommand } from "./login-cmd.js";
 import { registerLogoutCommand } from "./logout-cmd.js";
 import { registerModelsCommand } from "./models-cmd.js";
 import { CacheMetrics } from "../core/cache/metrics.js";
+import { registerTestInkCommand } from "./testink-cmd.js";
 
 const program = new Command();
 const metrics = new CacheMetrics();
@@ -45,5 +46,7 @@ registerStatsCommand(program, metrics);
 program
   .addCommand(createReviewCommand())
   .addCommand(createMemoryCommand());
+
+registerTestInkCommand(program);
 
 program.parseAsync(process.argv);

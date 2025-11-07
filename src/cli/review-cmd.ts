@@ -4,31 +4,54 @@ import chalk from "chalk";
 import fs from "fs/promises";
 import path from "path";
 import inquirer from "inquirer";
-import { getUnstagedChanges, getStagedChanges, getDiff, getCommitDiff } from "../utils/git.js";
+import React from "react";
+import {
+  getUnstagedChanges,
+  getStagedChanges,
+  getDiff,
+  getCommitDiff,
+} from "../utils/git.js";
 import { loadLLMConfig } from "../config/loader.js";
 import { CodeReviewer } from "../core/review/reviewer.js";
 import { TextFormatter } from "../core/review/formatters/text-formatter.js";
 import { selectFiles } from "../utils/file-selector.js";
 import type { LLMConfig, ReviewConfig } from "../config/schema.js";
 import type { ReviewIssue } from "../core/review/issue.js";
+import ReviewSummary from "../ui/review/ReviewSummary.js";
+
+let inkModule: typeof import("ink") | null = null;
+
+async function getInk() {
+  if (!inkModule) {
+    process.env.DEV = "false";
+    inkModule = await import("ink");
+  }
+  return inkModule;
+}
 
 /**
  * Apply a fix to a file
  */
-async function applyFix(issue: ReviewIssue, repoPath: string): Promise<boolean> {
-  if (!issue.suggestion || typeof issue.suggestion === 'string') {
-    console.log(chalk.yellow('  No code fix available for this issue'));
+async function applyFix(
+  issue: ReviewIssue,
+  repoPath: string
+): Promise<boolean> {
+  if (!issue.suggestion || typeof issue.suggestion === "string") {
+    console.log(chalk.yellow("  No code fix available for this issue"));
     return false;
   }
 
   const filePath = path.join(repoPath, issue.location.file);
 
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    const lines = content.split('\n');
+    const content = await fs.readFile(filePath, "utf-8");
+    const lines = content.split("\n");
 
     // If we have endLine, replace the range
-    if (issue.location.endLine && issue.location.endLine > issue.location.line) {
+    if (
+      issue.location.endLine &&
+      issue.location.endLine > issue.location.line
+    ) {
       const startLine = issue.location.line - 1; // 0-indexed
       const endLine = issue.location.endLine - 1;
       const numLinesToReplace = endLine - startLine + 1;
@@ -39,13 +62,19 @@ async function applyFix(issue: ReviewIssue, repoPath: string): Promise<boolean> 
       lines[issue.location.line - 1] = issue.suggestion.code;
     }
 
-    const newContent = lines.join('\n');
-    await fs.writeFile(filePath, newContent, 'utf-8');
+    const newContent = lines.join("\n");
+    await fs.writeFile(filePath, newContent, "utf-8");
 
-    console.log(chalk.green('  ✓ Fix applied successfully'));
+    console.log(chalk.green("  ✓ Fix applied successfully"));
     return true;
   } catch (error) {
-    console.error(chalk.red(`  ✗ Failed to apply fix: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    console.error(
+      chalk.red(
+        `  ✗ Failed to apply fix: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      )
+    );
     return false;
   }
 }
@@ -53,53 +82,70 @@ async function applyFix(issue: ReviewIssue, repoPath: string): Promise<boolean> 
 /**
  * Interactively prompt user to accept/reject fixes
  */
-async function interactiveFixReview(issues: ReviewIssue[], repoPath: string): Promise<void> {
-  const fixableIssues = issues.filter(issue =>
-    issue.suggestion && typeof issue.suggestion !== 'string' && issue.suggestion.code
+async function interactiveFixReview(
+  issues: ReviewIssue[],
+  repoPath: string
+): Promise<void> {
+  const fixableIssues = issues.filter(
+    (issue) =>
+      issue.suggestion &&
+      typeof issue.suggestion !== "string" &&
+      issue.suggestion.code
   );
 
   if (fixableIssues.length === 0) {
-    console.log(chalk.yellow('\nNo automatic fixes available for the found issues.'));
+    console.log(
+      chalk.yellow("\nNo automatic fixes available for the found issues.")
+    );
     return;
   }
 
-  console.log(chalk.bold(`\n🔧 Found ${fixableIssues.length} issue(s) with suggested fixes\n`));
+  console.log(
+    chalk.bold(
+      `\n🔧 Found ${fixableIssues.length} issue(s) with suggested fixes\n`
+    )
+  );
 
   for (const issue of fixableIssues) {
     console.log(chalk.cyan(`\n${issue.location.file}:${issue.location.line}`));
     console.log(chalk.bold(`  ${issue.title}`));
     console.log(chalk.gray(`  ${issue.description}\n`));
 
-    const suggestionText = typeof issue.suggestion === 'string'
-      ? issue.suggestion
-      : issue.suggestion.description;
+    const suggestionText =
+      typeof issue.suggestion === "string"
+        ? issue.suggestion
+        : issue.suggestion.description;
     console.log(chalk.green(`  Suggested fix: ${suggestionText}`));
 
-    if (typeof issue.suggestion !== 'string' && issue.suggestion.code) {
-      console.log(chalk.gray('\n  Proposed code:'));
-      console.log(chalk.gray('  ' + issue.suggestion.code.split('\n').join('\n  ')));
+    if (typeof issue.suggestion !== "string" && issue.suggestion.code) {
+      console.log(chalk.gray("\n  Proposed code:"));
+      console.log(
+        chalk.gray("  " + issue.suggestion.code.split("\n").join("\n  "))
+      );
     }
 
-    const { action } = await inquirer.prompt([{
-      type: 'list',
-      name: 'action',
-      message: 'What would you like to do?',
-      choices: [
-        { name: 'Apply this fix', value: 'apply' },
-        { name: 'Skip this fix', value: 'skip' },
-        { name: 'Skip all remaining fixes', value: 'skip-all' }
-      ]
-    }]);
+    const { action } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "action",
+        message: "What would you like to do?",
+        choices: [
+          { name: "Apply this fix", value: "apply" },
+          { name: "Skip this fix", value: "skip" },
+          { name: "Skip all remaining fixes", value: "skip-all" },
+        ],
+      },
+    ]);
 
-    if (action === 'skip-all') {
-      console.log(chalk.yellow('\nSkipping all remaining fixes.'));
+    if (action === "skip-all") {
+      console.log(chalk.yellow("\nSkipping all remaining fixes."));
       break;
     }
 
-    if (action === 'apply') {
+    if (action === "apply") {
       await applyFix(issue, repoPath);
     } else {
-      console.log(chalk.gray('  Skipped'));
+      console.log(chalk.gray("  Skipped"));
     }
   }
 }
@@ -107,7 +153,10 @@ async function interactiveFixReview(issues: ReviewIssue[], repoPath: string): Pr
 /**
  * Create a diff-like structure from selected files
  */
-async function createDiffFromFiles(repoPath: string, filePaths: string[]): Promise<any> {
+async function createDiffFromFiles(
+  repoPath: string,
+  filePaths: string[]
+): Promise<any> {
   const files = [];
   let totalAdditions = 0;
 
@@ -121,44 +170,46 @@ async function createDiffFromFiles(repoPath: string, filePaths: string[]): Promi
       // Create a single chunk with all lines marked as context
       // This allows the reviewer to analyze the entire file
       const diffLines = lines.map((line, index) => ({
-        type: 'context' as const,
+        type: "context" as const,
         content: line,
         oldLineNumber: index + 1,
-        newLineNumber: index + 1
+        newLineNumber: index + 1,
       }));
 
       // Detect language from file extension
-      const ext = filePath.split('.').pop()?.toLowerCase();
+      const ext = filePath.split(".").pop()?.toLowerCase();
       const languageMap: Record<string, string> = {
-        'ts': 'typescript',
-        'tsx': 'typescript',
-        'js': 'javascript',
-        'jsx': 'javascript',
-        'py': 'python',
-        'rb': 'ruby',
-        'go': 'go',
-        'rs': 'rust',
-        'java': 'java',
-        'cpp': 'cpp',
-        'c': 'c',
-        'cs': 'csharp',
-        'php': 'php',
-        'swift': 'swift',
-        'kt': 'kotlin',
+        ts: "typescript",
+        tsx: "typescript",
+        js: "javascript",
+        jsx: "javascript",
+        py: "python",
+        rb: "ruby",
+        go: "go",
+        rs: "rust",
+        java: "java",
+        cpp: "cpp",
+        c: "c",
+        cs: "csharp",
+        php: "php",
+        swift: "swift",
+        kt: "kotlin",
       };
 
       files.push({
         path: filePath,
         status: "modified" as const,
-        chunks: [{
-          oldStart: 1,
-          oldLines: lines.length,
-          newStart: 1,
-          newLines: lines.length,
-          lines: diffLines,
-          header: filePath
-        }],
-        language: languageMap[ext || ''] || 'unknown'
+        chunks: [
+          {
+            oldStart: 1,
+            oldLines: lines.length,
+            newStart: 1,
+            newLines: lines.length,
+            lines: diffLines,
+            header: filePath,
+          },
+        ],
+        language: languageMap[ext || ""] || "unknown",
       });
 
       totalAdditions += lines.length;
@@ -171,20 +222,28 @@ async function createDiffFromFiles(repoPath: string, filePaths: string[]): Promi
     files,
     stats: {
       additions: totalAdditions,
-      deletions: 0
+      deletions: 0,
     },
-    base: 'working-tree',
-    head: 'selected-files'
+    base: "working-tree",
+    head: "selected-files",
   };
 }
 
 export function createReviewCommand(): Command {
   return new Command("review")
-    .description("Review code changes for bugs, security issues, and best practices")
-    .argument("[files...]", "Specific files to review (use @ to open file selector, default: unstaged changes)")
+    .description(
+      "Review code changes for bugs, security issues, and best practices"
+    )
+    .argument(
+      "[files...]",
+      "Specific files to review (use @ to open file selector, default: unstaged changes)"
+    )
     .option("--staged", "Review only staged changes")
     .option("--commit <sha>", "Review a specific commit")
-    .option("--branch <base>", "Review changes from a branch (compares with current branch)")
+    .option(
+      "--branch <base>",
+      "Review changes from a branch (compares with current branch)"
+    )
     .option(
       "--severity <level>",
       "Minimum severity to show (critical|high|medium|low|info)",
@@ -212,8 +271,17 @@ export function createReviewCommand(): Command {
           llmConfig = await loadLLMConfig();
         } catch (error) {
           spinner.fail("Authentication required");
-          console.log(chalk.yellow("\n" + (error instanceof Error ? error.message : "LLM configuration not found")));
-          console.log(chalk.cyan("\nTo get started, run: " + chalk.bold("scoutcli login")));
+          console.log(
+            chalk.yellow(
+              "\n" +
+                (error instanceof Error
+                  ? error.message
+                  : "LLM configuration not found")
+            )
+          );
+          console.log(
+            chalk.cyan("\nTo get started, run: " + chalk.bold("scoutcli login"))
+          );
           process.exit(1);
         }
 
@@ -224,7 +292,7 @@ export function createReviewCommand(): Command {
             logic: { enabled: true, strictness: 0.7 },
             security: { enabled: true, checks: ["all"] },
             performance: { enabled: true, thresholds: { complexity: 10 } },
-            patterns: { enabled: true, customRules: [] }
+            patterns: { enabled: true, customRules: [] },
           },
           autoFix: { enabled: false, safeOnly: true, require: "prompt" },
           include: ["**/*"],
@@ -233,29 +301,29 @@ export function createReviewCommand(): Command {
           memory: {
             enabled: options.memory !== false,
             learnFromFeedback: options.memory !== false,
-            shareAcrossRepos: false
+            shareAcrossRepos: false,
           },
           cache: { enabled: true, ttl: 86400 },
           output: { format: "text", verbose: false, groupBy: "severity" },
           mastra: {
             memory: {
               enabled: options.memory !== false,
-              storageDir: '.scout-code/memory',
-              vectorDb: 'local'
+              storageDir: ".scout-code/memory",
+              vectorDb: "local",
             },
             workflows: {
               parallel: true,
-              timeout: 300000
+              timeout: 300000,
             },
             agents: {
               temperature: {
                 security: 0.2,
                 performance: 0.3,
-                logic: 0.3
+                logic: 0.3,
               },
-              maxSteps: 3
-            }
-          }
+              maxSteps: 3,
+            },
+          },
         };
 
         // 2. Get the repository path (assume current directory)
@@ -265,9 +333,15 @@ export function createReviewCommand(): Command {
         let selectedFiles: string[] | null = null;
 
         // Check if user wants to select files interactively
-        if (files.length > 0 && files.some(f => f === "@" || f.startsWith("@"))) {
+        if (
+          files.length > 0 &&
+          files.some((f) => f === "@" || f.startsWith("@"))
+        ) {
           spinner.stop();
-          selectedFiles = await selectFiles(repoPath, "Select files to review (space to select, enter to confirm)");
+          selectedFiles = await selectFiles(
+            repoPath,
+            "Select files to review (space to select, enter to confirm)"
+          );
           spinner.start("Analyzing changes...");
         } else if (files.length > 0) {
           selectedFiles = files;
@@ -292,11 +366,17 @@ export function createReviewCommand(): Command {
 
         if (!diff || diff.files.length === 0) {
           spinner.succeed("No changes to review");
-          console.log(chalk.gray("\nTip: Make some code changes or use --staged or --commit options"));
+          console.log(
+            chalk.gray(
+              "\nTip: Make some code changes or use --staged or --commit options"
+            )
+          );
           return;
         }
 
-        console.log(chalk.gray(`\nReviewing ${diff.files.length} file(s)...\n`));
+        console.log(
+          chalk.gray(`\nReviewing ${diff.files.length} file(s)...\n`)
+        );
 
         // 4. Initialize reviewer
         spinner.text = "Initializing AI reviewer...";
@@ -311,30 +391,41 @@ export function createReviewCommand(): Command {
             severity: options.severity as any,
             analyzers: options.analyzers,
             quick: options.quick,
-            verbose: options.verbose
+            verbose: options.verbose,
           },
           (current, total, fileName) => {
-            const shortPath = fileName.length > 40
-              ? "..." + fileName.slice(-37)
-              : fileName;
+            const shortPath =
+              fileName.length > 40 ? "..." + fileName.slice(-37) : fileName;
             spinner.text = `Analyzing file ${current}/${total}: ${shortPath}`;
           }
         );
 
-        spinner.succeed(`Review complete - found ${results.issues.length} issue(s)`);
+        spinner.succeed(
+          `Review complete - found ${results.issues.length} issue(s)`
+        );
 
         // 6. Show similar issues if requested
         if (options.similar) {
           const memory = reviewer.getMemory();
           if (memory && results.issues.length > 0) {
-            console.log(chalk.bold('\n🔍 Similar Past Issues:\n'));
+            console.log(chalk.bold("\n🔍 Similar Past Issues:\n"));
 
             for (const issue of results.issues.slice(0, 3)) {
-              const similar = await memory.findSimilarIssues(issue.location.file, issue.type, 2);
+              const similar = await memory.findSimilarIssues(
+                issue.location.file,
+                issue.type,
+                2
+              );
               if (similar.length > 0) {
-                console.log(chalk.cyan(`  ${issue.location.file}:${issue.location.line} - ${issue.title}`));
+                console.log(
+                  chalk.cyan(
+                    `  ${issue.location.file}:${issue.location.line} - ${issue.title}`
+                  )
+                );
                 for (const sim of similar) {
-                  const feedback = sim.userFeedback ? `[${sim.userFeedback}]` : '[no feedback]';
+                  const feedback = sim.userFeedback
+                    ? `[${sim.userFeedback}]`
+                    : "[no feedback]";
                   console.log(chalk.gray(`    Previously seen: ${feedback}`));
                 }
                 console.log();
@@ -345,7 +436,19 @@ export function createReviewCommand(): Command {
 
         // 7. Display results
         const formatter = new TextFormatter();
-        formatter.format(results);
+        const shouldUseInk = process.stdout.isTTY;
+
+        if (shouldUseInk) {
+          const ink = await getInk();
+          const app = ink.render(
+            React.createElement(ReviewSummary, { results, ink })
+          );
+          await app.waitUntilExit();
+        }
+
+        if (!shouldUseInk || options.verbose) {
+          formatter.format(results);
+        }
 
         // 8. Interactive fix mode
         if (options.fix && results.issues.length > 0) {
@@ -353,8 +456,12 @@ export function createReviewCommand(): Command {
         }
 
         // Exit with error code if critical/high severity issues found
-        const criticalCount = results.issues.filter(i => i.severity === "critical").length;
-        const highCount = results.issues.filter(i => i.severity === "high").length;
+        const criticalCount = results.issues.filter(
+          (i) => i.severity === "critical"
+        ).length;
+        const highCount = results.issues.filter(
+          (i) => i.severity === "high"
+        ).length;
 
         if (criticalCount > 0 || highCount > 0) {
           process.exit(1);

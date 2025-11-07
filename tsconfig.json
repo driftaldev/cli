@@ -6,6 +6,7 @@
     "moduleDetection": "force",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "jsx": "react-jsx",
     "skipLibCheck": true,
     "strict": true,
     "resolveJsonModule": true,

@@ -1,0 +1,1040 @@
+[
+  {
+    "id": "6839e1f2-4b6a-440e-86b0-c7ba4bdc1e6f",
+    "timestamp": 1762415806155,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input from environment variable SCOUT_PYTHON is used in spawning a child process without proper sanitization.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": "Sanitize and validate the SCOUT_PYTHON environment variable before using it to spawn a process. Consider using a whitelist of allowed executables.",
+      "rationale": "An attacker could modify SCOUT_PYTHON to execute arbitrary commands on the server.",
+      "confidence": 0.9
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "5f2c3e24-eb6b-416f-95cd-dca7df720ffe",
+    "timestamp": 1762415806155,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Potential exposure of sensitive environment variable names in logs.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "cwe": "CWE-532",
+      "suggestion": "Avoid logging sensitive information directly. If necessary, mask or hash sensitive parts before logging.",
+      "rationale": "Logging sensitive environment variable names can help an attacker identify potential targets for further attacks.",
+      "confidence": 0.75
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a97d8a4d-c060-4e88-99d5-6ad6f54211e4",
+    "timestamp": 1762415806155,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Insecure Default Configuration",
+      "description": "The application does not enforce secure configurations for cloud environments, relying on user configuration.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 19
+      },
+      "cwe": "CWE-453",
+      "suggestion": "Implement secure defaults in the application configuration, requiring explicit action from the administrator to weaken security settings.",
+      "rationale": "Relying on users to configure security settings correctly can lead to misconfigurations and potential vulnerabilities.",
+      "confidence": 0.7
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0875ceab-3819-48d2-aeb0-37d449754b98",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used to construct a command line for spawning a process, which can lead to command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize and validate all user inputs used in command line execution, or use more secure APIs that handle command parameters safely.",
+        "code": "this.process = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8765'], { cwd, detached: true, stdio: 'ignore' });"
+      },
+      "rationale": "Using environment variables or other external inputs in command execution without proper sanitization can allow an attacker to execute arbitrary commands.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "5d75c644-6ab4-483e-983c-abbbe0f869c0",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Unhandled promise rejection in daemon command actions",
+      "description": "The async actions within the daemon command handler do not handle promise rejections, which can lead to unhandled promise rejections if an error occurs during the start, stop, or status operations.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 204
+      },
+      "problematicPath": "When an error occurs in manager.start(), manager.stop(), or manager.status() and it is not caught",
+      "edgeCases": [
+        "Network issues during client.health()",
+        "File system errors during loadConfig()"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around the async operations to handle errors gracefully",
+        "code": "try { await manager.start(); } catch (error) { logger.error('Failed to start daemon:', error); }"
+      },
+      "rationale": "Preventing unhandled promise rejections ensures the application does not crash unexpectedly and provides better error feedback to the user.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ff7c5ac7-17db-48c1-8675-bad33dda1195",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Sensitive environment variable names are logged, which could lead to information disclosure if logs are improperly handled or accessed.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "cwe": "CWE-532",
+      "suggestion": {
+        "description": "Avoid logging sensitive information directly. Use placeholders or mask the values in logs.",
+        "code": "logger.warn(`Hosted Redis configured but missing secret environment variable(s): [REDACTED].`);"
+      },
+      "rationale": "Logging sensitive information can lead to it being exposed through log files or log management systems that are not secure.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "dece7594-a54d-4f45-91c0-f72e1cddf72d",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated configuration loading",
+      "description": "Configuration is loaded multiple times across different methods which can be inefficient and slow down the system.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 12
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load configuration once and reuse it across methods to avoid unnecessary I/O operations.",
+        "code": "const config = await loadConfig();\nthis.config = config;"
+      },
+      "alternative": "Store the configuration in a class property after the first load",
+      "rationale": "Minimizing I/O operations can significantly improve performance, especially in a configuration-heavy environment.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c50b27ef-c2ca-4b51-ae4d-5dd9d9b3e3a0",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Excessive logging",
+      "description": "The code contains a high volume of debug and info logs which can degrade performance and clutter log files.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 14
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Reduce the verbosity of logging or implement log levels to control the output based on the environment.",
+        "code": "if (process.env.NODE_ENV === 'production') { logger.setLevel('info'); }"
+      },
+      "alternative": "Use environment-based log levels",
+      "rationale": "Reducing unnecessary logging in production can improve performance and make important logs more visible.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "15fa551e-656e-4c6d-a6a7-a91bf9f29aaf",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Inefficient health check retry mechanism",
+      "description": "The health check retry mechanism uses a fixed delay which may not be optimal for all environments.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 142
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Implement an exponential backoff strategy for retrying health checks to handle failures more gracefully.",
+        "code": "await new Promise((resolve) => setTimeout(resolve, 500 * Math.pow(2, i)));"
+      },
+      "alternative": "Use exponential backoff for retries",
+      "rationale": "Exponential backoff can reduce the load on the system and improve the success rate of retries in unstable network conditions.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0fb5312f-974d-4b57-8d0b-58af8abc8047",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Incorrect conditional logic for cloudAuth.missingIndexerEnvVar and cloudAuth.missingRedisEnvVar checks",
+      "description": "The condition checks for missing environment variables incorrectly rely on config.cloud?.api_key being falsy, which is not directly related to whether the environment variables are set.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "problematicPath": "When config.cloud.api_key is truthy but the environment variables are still not set",
+      "edgeCases": [
+        "config.cloud.api_key is set but required environment variables are missing"
+      ],
+      "suggestion": {
+        "description": "Correct the conditional checks to directly verify if the environment variables are set",
+        "code": "if (!process.env[cloudAuth.missingIndexerEnvVar]) { logger.warn(`Environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`); }"
+      },
+      "rationale": "Ensuring the correct conditions are checked prevents misleading log messages and potential runtime errors due to misconfiguration.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "3e21bfac-6853-4b64-902b-08ff2d13bba5",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential infinite loop in waitForHealth if client.health() never returns true",
+      "description": "The waitForHealth method retries indefinitely if the indexer service does not become healthy within the retry limit, due to the loop condition being based on retries but not breaking out if health check never passes.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "problematicPath": "When client.health() continuously returns false",
+      "edgeCases": [
+        "Indexer service is down",
+        "Network issues"
+      ],
+      "suggestion": {
+        "description": "Add a break condition if the maximum number of retries is reached without a successful health check",
+        "code": "if (i === retries - 1) throw new Error('Indexer service failed to start in time');"
+      },
+      "rationale": "Preventing an infinite loop ensures that the system can recover or handle errors appropriately instead of being stuck in an unresponsive state.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "2920b2c2-1e6e-4e63-a411-c7c0cb21d73a",
+    "timestamp": 1762416521967,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary process detachment",
+      "description": "Detaching the child process and ignoring its output can lead to zombie processes if not managed properly.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 64
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Manage child processes properly to avoid potential resource leaks.",
+        "code": "this.process = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8765'], { cwd, stdio: 'inherit' });"
+      },
+      "alternative": "Attach event listeners to handle 'close' and 'exit' events of the child process",
+      "rationale": "Proper management of child processes ensures that no resources are wasted and the system remains stable.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "7f5279a5-a0e5-41fd-8a16-c01119bce883",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used in spawning a child process without proper sanitization, leading to potential command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize or validate all user inputs used in command execution or use safer APIs that do not allow execution of additional commands.",
+        "code": "const python = process.env.SCOUT_PYTHON ? path.basename(process.env.SCOUT_PYTHON) : 'python3';"
+      },
+      "rationale": "Using unsanitized user input in command execution can allow attackers to execute arbitrary commands on the host system.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "e54fd62d-0b8a-475f-a8b8-d2389a3b4f8b",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Potential unhandled promise rejection in daemon command action",
+      "description": "The async action handler in the 'daemon' command does not handle exceptions, which could lead to unhandled promise rejections if an error occurs during the start, stop, or status operations.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 176
+      },
+      "problematicPath": "Errors thrown in the async functions start(), stop(), or status() are not caught",
+      "edgeCases": [
+        "Network issues during start",
+        "Permissions issues during stop",
+        "Service unavailability during status"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around the async operations to handle potential errors gracefully",
+        "code": "try {\n  await manager.start();\n} catch (error) {\n  logger.error('Failed to start daemon:', error);\n}"
+      },
+      "rationale": "Handling errors in asynchronous operations prevents the application from crashing and allows for better error reporting and recovery.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "13d25185-f6d6-490f-b292-a13d7d306104",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Environment variable names that may contain sensitive information are logged, potentially exposing sensitive data.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "cwe": "CWE-532",
+      "suggestion": {
+        "description": "Avoid logging sensitive information or environment variable names that could contain sensitive data.",
+        "code": "logger.warn('Environment variable for cloud hosting is not set. Requests may fail.');"
+      },
+      "rationale": "Logging sensitive information can lead to it being exposed in log files which might not be securely handled.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "bb702abb-ca9e-4161-a7e0-70b2e883e362",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated loading of configuration in multiple methods",
+      "description": "The configuration is loaded repeatedly in start, stop, and status methods, which could be inefficient if the configuration loading is heavy.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 10
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load the configuration once in the constructor or lazily and reuse it across methods.",
+        "code": "class DaemonManager {\n  private config: ConfigType;\n  constructor() {\n    this.config = loadConfig();\n  }\n}"
+      },
+      "alternative": "Use a singleton pattern for configuration management",
+      "rationale": "Avoids unnecessary I/O or computational overhead by reusing the loaded configuration.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "1f809509-3f2f-456a-9dcf-b50eea8d64bf",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Excessive logging in daemon operations",
+      "description": "The code contains multiple debug logs that could slow down the operations if the logging level includes debug and the log volume is high.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 12
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Reduce the verbosity of logging or make it conditional based on the environment or configuration settings.",
+        "code": "if (process.env.NODE_ENV === 'production') {\n  logger.setLevel('info');\n}"
+      },
+      "alternative": "Implement log levels and conditionally log messages",
+      "rationale": "Reduces the performance overhead caused by logging in production environments.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ae851d82-ac67-43ab-b981-3af189963635",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejection",
+      "description": "The method waitForHealth uses a for loop with async calls without proper error handling, which could lead to unhandled promise rejections if the health check fails.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 150
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Add try-catch blocks inside the loop to handle possible errors from the health check.",
+        "code": "for (let i = 0; i < retries; i++) {\n  try {\n    if (await client.health()) {\n      return;\n    }\n  } catch (error) {\n    logger.error('Health check failed', error);\n  }\n  await new Promise((resolve) => setTimeout(resolve, 500));\n}"
+      },
+      "alternative": "Use robust error handling mechanisms for asynchronous operations",
+      "rationale": "Prevents potential crashes or unresponsive behavior due to unhandled errors.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "563b816f-4318-4919-9328-4e77689964d4",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Incorrect conditional logic for cloudAuth.missingIndexerEnvVar and cloudAuth.missingRedisEnvVar",
+      "description": "The condition checks for missing environment variables incorrectly rely on 'config.cloud?.api_key' being falsy, which is not directly related to whether the environment variables are set.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 28
+      },
+      "problematicPath": "The condition 'cloudAuth.missingIndexerEnvVar && !config.cloud?.api_key' does not correctly validate the presence of the environment variable",
+      "edgeCases": [
+        "API key is set but environment variables are missing"
+      ],
+      "suggestion": {
+        "description": "Correct the conditional logic to directly check for the presence of the required environment variables",
+        "code": "if (cloudAuth.missingIndexerEnvVar) {\n  logger.warn(`Environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`);\n}"
+      },
+      "rationale": "The current logic may lead to incorrect warnings or missing warnings about unset environment variables.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "653662ba-c1f5-4dff-9deb-8f55e37fb433",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential race condition in waitForHealth",
+      "description": "The waitForHealth function uses a for loop with asynchronous calls without managing the potential race conditions that could arise from multiple simultaneous calls to client.health().",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 138
+      },
+      "problematicPath": "Multiple calls to client.health() could overlap and cause inconsistent states or errors",
+      "edgeCases": [
+        "High network latency",
+        "Intermittent connectivity"
+      ],
+      "suggestion": {
+        "description": "Implement a locking mechanism or ensure that calls to client.health() are managed to prevent overlap",
+        "code": "// Example using a simple locking mechanism\nprivate healthCheckInProgress = false;\n\nprivate async waitForHealth(client: IndexerClient, retries = 10): Promise<void> {\n  if (this.healthCheckInProgress) return;\n  this.healthCheckInProgress = true;\n  // existing logic\n  this.healthCheckInProgress = false;\n}"
+      },
+      "rationale": "Preventing race conditions ensures that the system's state remains consistent and predictable, especially under varying network conditions.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ea6ae750-e28b-466b-855e-2cde09b24b34",
+    "timestamp": 1762418581760,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary checks and warnings in cloud-enabled configuration",
+      "description": "The code performs multiple checks and logs warnings about missing configurations even when cloud hosting is enabled and these checks might not be necessary.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 20
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Refactor the cloud configuration checks into a separate method and call it only when necessary.",
+        "code": "if (config.cloud?.enabled) {\n  this.checkCloudConfig(cloudAuth);\n}"
+      },
+      "alternative": "Consolidate configuration validation in a single method",
+      "rationale": "Improves code clarity and efficiency by avoiding unnecessary checks.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "24e4dc96-f6e1-4db5-b2b0-2df52de0d3ae",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used in spawning a child process without proper sanitization, leading to potential command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize or validate all user inputs used in command execution or use safer alternatives like execFile when parameters are expected.",
+        "code": "this.process = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8765'], { cwd, detached: true, stdio: 'ignore' });"
+      },
+      "rationale": "Using unsanitized user input in command execution can allow attackers to execute arbitrary commands on the host system.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a96bd179-7e77-4e97-a31c-50640ada8f68",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "high",
+      "title": "Potential memory leak in health check retries",
+      "description": "Using a loop with a timeout for retries without proper cancellation can lead to potential memory leaks if not handled correctly.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "complexity": "O(n)",
+      "impact": "high",
+      "suggestion": {
+        "description": "Implement a cancellation mechanism for the health check retries to prevent potential memory leaks.",
+        "code": "let timeout;\nfor (let i = 0; i < retries; i++) {\n  if (await client.health()) {\n    clearTimeout(timeout);\n    return;\n  }\n  timeout = setTimeout(resolve, 500);\n}\nclearTimeout(timeout);"
+      },
+      "alternative": "Use a more robust library or framework for handling retries with built-in cancellation support.",
+      "rationale": "Prevents memory leaks and ensures that resources are cleaned up properly after operations.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "def46cf5-7ece-464e-ad6f-df3360b94585",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Incorrect conditional logic for cloudAuth checks",
+      "description": "The conditional checks for missing environment variables are incorrect because they also check for the absence of 'config.cloud?.api_key' which is unrelated to the specific missing environment variables being checked.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 28
+      },
+      "problematicPath": "When 'config.cloud?.api_key' is not set, unrelated warnings about missing environment variables are logged.",
+      "edgeCases": [
+        "config.cloud.api_key is undefined but environment variables are set"
+      ],
+      "suggestion": {
+        "description": "Separate the checks for missing environment variables from the check for 'config.cloud?.api_key'.",
+        "code": "if (cloudAuth.missingIndexerEnvVar) {\n  logger.warn(`Cloud hosting enabled but environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`);\n}\nif (cloudAuth.missingRedisEnvVar) {\n  logger.warn(`Hosted Redis configured but missing secret environment variable(s): ${cloudAuth.missingRedisEnvVar}.`);\n}"
+      },
+      "rationale": "The current logic may lead to misleading warnings being logged, confusing the user about the actual configuration issues.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "d51efcde-8c47-47ca-93dd-9be1292da110",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Sensitive information such as API keys and environment variables are logged, which could lead to information disclosure if logs are improperly handled or accessed.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "cwe": "CWE-532",
+      "suggestion": {
+        "description": "Avoid logging sensitive information directly. Use placeholders or mask the sensitive parts before logging.",
+        "code": "logger.warn(`Cloud hosting enabled but environment variable is not set. Requests may fail.`);"
+      },
+      "rationale": "Logging sensitive information can expose it to unauthorized parties, especially if logs are not secured or are improperly accessed.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "bf419abb-d342-47eb-93d9-2e85f6fbbf54",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated loading of configuration",
+      "description": "The configuration is loaded multiple times in different methods which can be inefficient, especially if the configuration loading is a heavy operation.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 10
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load the configuration once and reuse it across methods.",
+        "code": "const config = await loadConfig();\nthis.config = config;"
+      },
+      "alternative": "Store the loaded configuration in a class property after the first load.",
+      "rationale": "Avoids multiple I/O operations or computations to load configuration repeatedly.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "515b15e9-48c3-41c1-94e1-546c9009cc5b",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Excessive logging",
+      "description": "The code contains a high number of debug logging statements which can degrade performance, especially in production environments.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 12
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Reduce the number of debug logs or implement a logging level control to minimize performance impact in production.",
+        "code": "if (process.env.NODE_ENV !== 'production') { logger.debug('message'); }"
+      },
+      "alternative": "Use environment-based logging levels to control verbosity.",
+      "rationale": "Reduces the overhead caused by logging in performance-sensitive environments.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "1d924595-e290-4e76-9b05-413408582acd",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejection",
+      "description": "The 'waitForHealth' function throws an error after retries fail, but this error is not caught in the 'start' method, potentially leading to an unhandled promise rejection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 75
+      },
+      "problematicPath": "If 'waitForHealth' throws an error, it is not caught in 'start'.",
+      "edgeCases": [
+        "All health check retries fail"
+      ],
+      "suggestion": {
+        "description": "Add error handling in the 'start' method to catch and handle the error thrown by 'waitForHealth'.",
+        "code": "try {\n  await this.waitForHealth(client);\n} catch (error) {\n  logger.error('Failed to start indexer service:', error);\n}"
+      },
+      "rationale": "Handling this error properly ensures that the application can gracefully inform the user about the issue and take appropriate actions.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "67b4230f-cae0-41fb-b674-f645dd6bbf66",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary environment variable checks",
+      "description": "The code checks for environment variables repeatedly which could be optimized by caching their values.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 54
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Cache the environment variable at the start and reuse it.",
+        "code": "const python = process.env.SCOUT_PYTHON ?? 'python3';\nthis.python = python;"
+      },
+      "alternative": "Store environment variables in a class property or a configuration object.",
+      "rationale": "Avoids accessing the environment variables multiple times which is relatively slower.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "7d2b52b7-383d-4223-97a3-7b15756f54d5",
+    "timestamp": 1762497304015,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Inconsistent error logging for unknown daemon action",
+      "description": "The error for an unknown daemon action is logged twice with different messages, which could be confusing.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "problematicPath": "When an unknown action is received, two error logs are generated.",
+      "edgeCases": [
+        "Unknown action string provided"
+      ],
+      "suggestion": {
+        "description": "Consolidate the error messages into a single log entry.",
+        "code": "logger.error(`Unknown daemon action received: ${action}. Use start, stop, or status.`);"
+      },
+      "rationale": "Consolidating the error messages into a single log entry will provide clearer communication to the user.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0a1cd111-84e5-4cbc-9bbd-12c14e8e46ec",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used to construct a command line for spawning a child process, which can lead to command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize and validate all user inputs used in command line execution or use more secure alternatives like execFile when parameters are used.",
+        "code": "this.process = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8765'], { cwd, detached: true, stdio: 'ignore' });"
+      },
+      "rationale": "Using unsanitized input in command execution allows attackers to execute arbitrary commands on the host system.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a0db6e80-d648-491a-b466-19be55a7f8f4",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Incorrect conditional logic for cloudAuth.missingIndexerEnvVar and cloudAuth.missingRedisEnvVar checks",
+      "description": "The condition checks for missing environment variables incorrectly rely on `config.cloud?.api_key` being falsy to log warnings, which may not be the intended logic.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 28
+      },
+      "problematicPath": "When `config.cloud?.api_key` is truthy, the warnings for missing environment variables are not logged even if they are missing.",
+      "edgeCases": [
+        "API key is set but environment variables are missing"
+      ],
+      "suggestion": {
+        "description": "Remove the dependency on `config.cloud?.api_key` for logging warnings about missing environment variables.",
+        "code": "if (cloudAuth.missingIndexerEnvVar) {\n  logger.warn(\n    `Cloud hosting enabled but environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`\n  );\n}\nif (cloudAuth.missingRedisEnvVar) {\n  logger.warn(\n    `Hosted Redis configured but missing secret environment variable(s): ${cloudAuth.missingRedisEnvVar}.`\n  );\n}"
+      },
+      "rationale": "The current logic may prevent important warnings from being logged, potentially leading to runtime issues that are difficult to diagnose.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b1af709a-258e-451d-a310-c23ebc275618",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Sensitive information such as API keys and environment variables are logged, which can lead to information disclosure if logs are improperly secured or accessed.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 27
+      },
+      "cwe": "CWE-532",
+      "suggestion": {
+        "description": "Avoid logging sensitive information directly. Use placeholders or mask the values in logs.",
+        "code": "logger.warn(`Cloud hosting enabled but environment variable for indexer is not set. Requests may fail.`);"
+      },
+      "rationale": "Exposing sensitive information in logs can lead to unauthorized access and should be avoided to protect the integrity and confidentiality of the data.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "e765dc56-e4f8-4dcd-a344-39b8ac9be37c",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated loading of configuration in multiple methods",
+      "description": "The configuration is loaded repeatedly in start, stop, and status methods, which could be inefficient if the configuration loading is heavy.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 10
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load the configuration once in the constructor or lazily and reuse it across methods.",
+        "code": "class DaemonManager {\n  private config: ConfigType;\n  constructor() {\n    this.config = loadConfig();\n  }\n}"
+      },
+      "alternative": "Singleton pattern for configuration management",
+      "rationale": "Avoids the overhead of loading configuration multiple times, which can include file I/O or network requests.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "9d82146d-2ad8-4c0d-91d8-5130f85f7b56",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Excessive logging in daemon operations",
+      "description": "The code contains a high volume of debug and info logs which can slow down the operations especially when the logging level includes writing to disk or over network.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 12
+      },
+      "complexity": "O(1)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Reduce the verbosity of logs in production or implement conditional logging based on the environment or configuration.",
+        "code": "if (process.env.NODE_ENV === 'development') {\n  logger.debug('Detailed debug log');\n}"
+      },
+      "alternative": "Conditional or environment-based logging",
+      "rationale": "Reduces the performance overhead caused by logging in production environments.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "9d8536dd-260b-471b-8bd0-172c328daff3",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejection in waitForHealth",
+      "description": "The method waitForHealth uses a for loop with asynchronous operations without proper error handling which might lead to unhandled promise rejections.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 130
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Add try-catch blocks inside the loop to handle possible errors from the health check method.",
+        "code": "for (let i = 0; i < retries; i++) {\n  try {\n    if (await client.health()) {\n      return;\n    }\n  } catch (error) {\n    logger.error('Health check failed', error);\n  }\n  await new Promise((resolve) => setTimeout(resolve, 500));\n}"
+      },
+      "alternative": "Improved error handling in asynchronous loops",
+      "rationale": "Prevents potential crashes or unhandled errors during the health check retries.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c3bf33f9-88bc-4e28-9e5b-f0232110b6d4",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejection in daemon command action",
+      "description": "The async actions within the daemon command handler do not have error handling, which could lead to unhandled promise rejections if an error occurs.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "problematicPath": "If an error occurs in `manager.start()`, `manager.stop()`, or `manager.status()`, it is not caught.",
+      "edgeCases": [
+        "Network issues",
+        "Configuration errors",
+        "Permission issues"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around the async operations to handle potential errors.",
+        "code": "try {\n  await manager.start();\n} catch (error) {\n  logger.error(`Failed to start daemon: ${error.message}`);\n}\n// Repeat for stop and status"
+      },
+      "rationale": "Handling errors in asynchronous operations prevents unhandled promise rejections and improves the robustness of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "633dddb7-d89c-4ed3-8637-ca370450e720",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Inconsistent error handling in waitForHealth method",
+      "description": "The `waitForHealth` method throws an error after retries are exhausted, but this exception is not handled in the `start` method, potentially leading to unhandled promise rejections.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 123
+      },
+      "problematicPath": "If `waitForHealth` throws an error, it is not caught in the `start` method.",
+      "edgeCases": [
+        "Indexer service fails to start"
+      ],
+      "suggestion": {
+        "description": "Add error handling for the `waitForHealth` call in the `start` method.",
+        "code": "try {\n  await this.waitForHealth(client);\n} catch (error) {\n  logger.error(`Failed to verify indexer health: ${error.message}`);\n  throw error;\n}"
+      },
+      "rationale": "Proper error handling ensures that errors are logged and managed appropriately, improving the reliability and maintainability of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "da18faa2-9bc0-4046-84b9-7abb498f6843",
+    "timestamp": 1762498245833,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary checks and warnings in cloud-enabled configuration",
+      "description": "The code performs multiple checks and logs warnings about missing configurations which could be streamlined or checked less frequently.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 20
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Consolidate configuration checks into a single method and call it once per action.",
+        "code": "private checkCloudConfig() {\n  if (this.config.cloud?.enabled) {\n    // Perform all checks here\n  }\n}"
+      },
+      "alternative": "Single consolidated configuration check method",
+      "rationale": "Improves code maintainability and reduces the number of conditional checks.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  }
+]

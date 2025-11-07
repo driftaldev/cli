@@ -1,0 +1,238 @@
+{
+  "repo_full_name": "test1",
+  "files": {
+    "src/core/cache/redis-cache.ts": {
+      "hash": "e151a89f293dc172caf7dd5cf91c318a",
+      "chunks": [
+        "src/core/cache/redis-cache.ts::chunk-0"
+      ]
+    },
+    "src/core/cache/metrics.ts": {
+      "hash": "bf4fcb10e7619d1ba2433234e20b1eeb",
+      "chunks": [
+        "src/core/cache/metrics.ts::chunk-0"
+      ]
+    },
+    "src/core/mcp/handlers.ts": {
+      "hash": "81b478160f1041fb917f7a4a6600e947",
+      "chunks": [
+        "src/core/mcp/handlers.ts::chunk-0"
+      ]
+    },
+    "src/core/mcp/tools.ts": {
+      "hash": "fcabc9c42b2d234958d61650a3948db9",
+      "chunks": [
+        "src/core/mcp/tools.ts::chunk-0",
+        "src/core/mcp/tools.ts::chunk-1",
+        "src/core/mcp/tools.ts::chunk-2"
+      ]
+    },
+    "src/core/mcp/transport.ts": {
+      "hash": "8bfe4e0378b8cda878455a627ab489e1",
+      "chunks": [
+        "src/core/mcp/transport.ts::chunk-0",
+        "src/core/mcp/transport.ts::chunk-1",
+        "src/core/mcp/transport.ts::chunk-2"
+      ]
+    },
+    "src/core/mcp/index.ts": {
+      "hash": "36db930dbdbda788ad19c2c5c719601b",
+      "chunks": [
+        "src/core/mcp/index.ts::chunk-0"
+      ]
+    },
+    "src/core/mcp/server.ts": {
+      "hash": "9eb25ee5c7efc10857d34e175e47e40e",
+      "chunks": [
+        "src/core/mcp/server.ts::chunk-0"
+      ]
+    },
+    "src/core/query/ranker.ts": {
+      "hash": "e7a2ee10584218df740873de85d66db6",
+      "chunks": [
+        "src/core/query/ranker.ts::chunk-0"
+      ]
+    },
+    "src/core/query/query-router.ts": {
+      "hash": "5bed2b2c260e43857cf014870968cc34",
+      "chunks": [
+        "src/core/query/query-router.ts::chunk-0"
+      ]
+    },
+    "src/core/query/context-builder.ts": {
+      "hash": "b8048c97b3b52374bfb8715c1748b697",
+      "chunks": [
+        "src/core/query/context-builder.ts::chunk-0"
+      ]
+    },
+    "src/core/query/cross-repo.ts": {
+      "hash": "ad1995048c145989991fac59738de35b",
+      "chunks": [
+        "src/core/query/cross-repo.ts::chunk-0"
+      ]
+    },
+    "src/core/indexer/moss-client.ts": {
+      "hash": "ff9c0b3ac4624e3e481c3d3aac5e1620",
+      "chunks": [
+        "src/core/indexer/moss-client.ts::chunk-0",
+        "src/core/indexer/moss-client.ts::chunk-1",
+        "src/core/indexer/moss-client.ts::chunk-2",
+        "src/core/indexer/moss-client.ts::chunk-3",
+        "src/core/indexer/moss-client.ts::chunk-4",
+        "src/core/indexer/moss-client.ts::chunk-5",
+        "src/core/indexer/moss-client.ts::chunk-6",
+        "src/core/indexer/moss-client.ts::chunk-7"
+      ]
+    },
+    "src/core/indexer/doc-crawler.ts": {
+      "hash": "089d2a7e867812553b3f1af0be7d4bd2",
+      "chunks": [
+        "src/core/indexer/doc-crawler.ts::chunk-0",
+        "src/core/indexer/doc-crawler.ts::chunk-1",
+        "src/core/indexer/doc-crawler.ts::chunk-2",
+        "src/core/indexer/doc-crawler.ts::chunk-3"
+      ]
+    },
+    "src/core/indexer/client.ts": {
+      "hash": "11de239a6a85c378f95d200b2c928034",
+      "chunks": [
+        "src/core/indexer/client.ts::chunk-0",
+        "src/core/indexer/client.ts::chunk-1",
+        "src/core/indexer/client.ts::chunk-2",
+        "src/core/indexer/client.ts::chunk-3",
+        "src/core/indexer/client.ts::chunk-4",
+        "src/core/indexer/client.ts::chunk-5",
+        "src/core/indexer/client.ts::chunk-6"
+      ]
+    },
+    "src/core/indexer/batch.ts": {
+      "hash": "0e3b9a5ee628c7fa0f7c84c14461a6ba",
+      "chunks": [
+        "src/core/indexer/batch.ts::chunk-0"
+      ]
+    },
+    "src/core/indexer/file-scanner.ts": {
+      "hash": "de7322d2ffaa649a821afd4851e22038",
+      "chunks": [
+        "src/core/indexer/file-scanner.ts::chunk-0"
+      ]
+    },
+    "src/config/schema.ts": {
+      "hash": "8690ea30824fcf2e5e87a33b5fc4e498",
+      "chunks": [
+        "src/config/schema.ts::chunk-0",
+        "src/config/schema.ts::chunk-1"
+      ]
+    },
+    "src/config/defaults.ts": {
+      "hash": "a7d0606cba9d529118092f1cdd1f8641",
+      "chunks": [
+        "src/config/defaults.ts::chunk-0"
+      ]
+    },
+    "src/config/loader.ts": {
+      "hash": "ba1c8ecb13e1382f6f1440e71c4b2fa6",
+      "chunks": [
+        "src/config/loader.ts::chunk-0",
+        "src/config/loader.ts::chunk-1",
+        "src/config/loader.ts::chunk-2",
+        "src/config/loader.ts::chunk-3",
+        "src/config/loader.ts::chunk-4"
+      ]
+    },
+    "src/utils/spinner.ts": {
+      "hash": "34c1c79c3a74d27e23d0e15cc8e327c5",
+      "chunks": [
+        "src/utils/spinner.ts::chunk-0"
+      ]
+    },
+    "src/utils/repo.ts": {
+      "hash": "60a670062ce62f621d2f1d729d354d27",
+      "chunks": [
+        "src/utils/repo.ts::chunk-0"
+      ]
+    },
+    "src/utils/hash.ts": {
+      "hash": "d10de2c2e463b60bdf0e5b1ea9c6b4cb",
+      "chunks": [
+        "src/utils/hash.ts::chunk-0"
+      ]
+    },
+    "src/utils/logger.ts": {
+      "hash": "b54713bb0745c0501bf1e06a949b70ad",
+      "chunks": [
+        "src/utils/logger.ts::chunk-0"
+      ]
+    },
+    "src/utils/cloud.ts": {
+      "hash": "b0c30bd7d3f5c78da84a5c87fc9e2a3b",
+      "chunks": [
+        "src/utils/cloud.ts::chunk-0"
+      ]
+    },
+    "src/utils/git.ts": {
+      "hash": "ed723222d1c1edfe7ecb2346927ac483",
+      "chunks": [
+        "src/utils/git.ts::chunk-0"
+      ]
+    },
+    "src/utils/files.ts": {
+      "hash": "e8db8a031c4fea50b82c27e93e88634b",
+      "chunks": [
+        "src/utils/files.ts::chunk-0"
+      ]
+    },
+    "src/utils/repo-name-store.ts": {
+      "hash": "447c50fd201d31a30d79ac2e9dd6afe2",
+      "chunks": [
+        "src/utils/repo-name-store.ts::chunk-0",
+        "src/utils/repo-name-store.ts::chunk-1"
+      ]
+    },
+    "src/cli/daemon.ts": {
+      "hash": "aba122f7c4870add5ad3cdd91dec9c85",
+      "chunks": [
+        "src/cli/daemon.ts::chunk-0",
+        "src/cli/daemon.ts::chunk-1",
+        "src/cli/daemon.ts::chunk-2",
+        "src/cli/daemon.ts::chunk-3"
+      ]
+    },
+    "src/cli/init.ts": {
+      "hash": "fe051a75c0787da0b0e4ffdc31888b2e",
+      "chunks": [
+        "src/cli/init.ts::chunk-0"
+      ]
+    },
+    "src/cli/stats.ts": {
+      "hash": "78e68d3e916e0a526a6cf9da375b999a",
+      "chunks": [
+        "src/cli/stats.ts::chunk-0"
+      ]
+    },
+    "src/cli/serve.ts": {
+      "hash": "24fdb23b0e5cabf73d3938c8df10ce0d",
+      "chunks": [
+        "src/cli/serve.ts::chunk-0",
+        "src/cli/serve.ts::chunk-1"
+      ]
+    },
+    "src/cli/index-cmd.ts": {
+      "hash": "100a788aeef25e5730e92a6d41a69db0",
+      "chunks": [
+        "src/cli/index-cmd.ts::chunk-0",
+        "src/cli/index-cmd.ts::chunk-1",
+        "src/cli/index-cmd.ts::chunk-2",
+        "src/cli/index-cmd.ts::chunk-3"
+      ]
+    },
+    "src/cli/index.ts": {
+      "hash": "62a56141d1157f6d3ee4da5050b43c00",
+      "chunks": [
+        "src/cli/index.ts::chunk-0"
+      ]
+    }
+  },
+  "created_at": "2025-11-04T08:02:50.514Z",
+  "updated_at": "2025-11-04T08:02:50.514Z"
+}

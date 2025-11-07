@@ -1,0 +1,2 @@
+name = "scout-code-cli"
+main = "src/cli/index.ts"

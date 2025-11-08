@@ -1,8 +1,13 @@
-import { MossClient as Moss, DocumentInfo, SearchResult as MossSearchResult } from "@inferedge/moss";
+import {
+  MossClient as Moss,
+  DocumentInfo,
+  SearchResult as MossSearchResult,
+} from "@inferedge/moss";
 import { Buffer } from "buffer";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as crypto from "crypto";
+import { fetchMossCredentials } from "../../utils/moss-credentials.js";
 
 export interface IndexFilePayload {
   path: string;
@@ -92,19 +97,36 @@ export class MossClient {
     indexDirectory: string = ".scout-code/indexes"
   ) {
     // Get Moss credentials from: 1) parameters, 2) environment variables
-    const id = projectId || process.env.MOSS_PROJECT_ID || process.env.PROJECT_ID;
-    const key = projectKey || process.env.MOSS_PROJECT_KEY || process.env.PROJECT_KEY;
+    const id =
+      projectId || process.env.MOSS_PROJECT_ID || process.env.PROJECT_ID;
+    const key =
+      projectKey || process.env.MOSS_PROJECT_KEY || process.env.PROJECT_KEY;
 
     if (!id || !key) {
       throw new Error(
         "Moss credentials not found. Set MOSS_PROJECT_ID and MOSS_PROJECT_KEY environment variables.\n" +
-        "Or pass projectId and projectKey to constructor.\n" +
-        "Get your credentials from: https://usemoss.dev"
+          "Or pass projectId and projectKey to constructor.\n" +
+          "Get your credentials from: https://usemoss.dev"
       );
     }
 
     this.moss = new Moss(id, key);
     this.indexDir = path.resolve(process.cwd(), indexDirectory);
+  }
+
+  /**
+   * Create a MossClient instance by fetching credentials from the backend
+   * This is the preferred method for authenticated CLI usage
+   */
+  static async fromBackend(
+    indexDirectory: string = ".scout-code/indexes"
+  ): Promise<MossClient> {
+    const credentials = await fetchMossCredentials();
+    return new MossClient(
+      credentials.project_id,
+      credentials.project_key,
+      indexDirectory
+    );
   }
 
   private async ensureIndexDir(): Promise<void> {
@@ -125,7 +147,10 @@ export class MossClient {
     }
   }
 
-  private async saveMetadata(indexName: string, metadata: IndexMetadata): Promise<void> {
+  private async saveMetadata(
+    indexName: string,
+    metadata: IndexMetadata
+  ): Promise<void> {
     const metaPath = this.getMetadataPath(indexName);
     await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2), "utf-8");
   }
@@ -134,15 +159,19 @@ export class MossClient {
     return crypto.createHash("md5").update(content).digest("hex");
   }
 
-  private chunkText(text: string, filePath: string, chunkIndex: number): { id: string; text: string; metadata: Record<string, string> } {
+  private chunkText(
+    text: string,
+    filePath: string,
+    chunkIndex: number
+  ): { id: string; text: string; metadata: Record<string, string> } {
     const id = `${filePath}::chunk-${chunkIndex}`;
     return {
       id,
       text,
       metadata: {
         file_path: filePath,
-        chunk_index: String(chunkIndex)
-      }
+        chunk_index: String(chunkIndex),
+      },
     };
   }
 
@@ -165,8 +194,8 @@ export class MossClient {
             file_path: filePath,
             chunk_index: String(chunkIndex),
             line_start: String(currentLineStart),
-            line_end: String(i - 1)
-          }
+            line_end: String(i - 1),
+          },
         });
         chunkIndex++;
 
@@ -188,8 +217,8 @@ export class MossClient {
           file_path: filePath,
           chunk_index: String(chunkIndex),
           line_start: String(currentLineStart),
-          line_end: String(lines.length - 1)
-        }
+          line_end: String(lines.length - 1),
+        },
       });
     }
 
@@ -203,11 +232,17 @@ export class MossClient {
     const allDocs: DocumentInfo[] = [];
     const fileMetadata: Record<string, { hash: string; chunks: string[] }> = {};
 
-    console.log(`Indexing ${payload.files.length} files for ${payload.repo_full_name}...`);
+    console.log(
+      `Indexing ${payload.files.length} files for ${payload.repo_full_name}...`
+    );
 
     for (const file of payload.files) {
       // Handle both content and content_base64
-      const content = file.content || (file.content_base64 ? Buffer.from(file.content_base64, "base64").toString("utf-8") : "");
+      const content =
+        file.content ||
+        (file.content_base64
+          ? Buffer.from(file.content_base64, "base64").toString("utf-8")
+          : "");
 
       if (!content) {
         console.warn(`Skipping file ${file.path}: no content provided`);
@@ -220,7 +255,7 @@ export class MossClient {
       allDocs.push(...chunks);
       fileMetadata[file.path] = {
         hash,
-        chunks: chunks.map(c => c.id)
+        chunks: chunks.map((c) => c.id),
       };
     }
 
@@ -240,32 +275,42 @@ export class MossClient {
         repo_full_name: payload.repo_full_name,
         files: fileMetadata,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
       await this.saveMetadata(indexName, metadata);
 
-      console.log(`Successfully indexed ${allDocs.length} chunks from ${payload.files.length} files`);
+      console.log(
+        `Successfully indexed ${allDocs.length} chunks from ${payload.files.length} files`
+      );
 
       return {
         status: "success",
         repo: payload.repo_full_name,
         files_indexed: payload.files.length,
-        message: `Indexed ${allDocs.length} chunks`
+        message: `Indexed ${allDocs.length} chunks`,
       };
     } catch (error) {
       console.error("Failed to create index:", error);
-      throw new Error(`Failed to index: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to index: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
-  async incrementalIndex(payload: IncrementalIndexRequest): Promise<IncrementalIndexResponse> {
+  async incrementalIndex(
+    payload: IncrementalIndexRequest
+  ): Promise<IncrementalIndexResponse> {
     await this.ensureIndexDir();
 
     const indexName = payload.repo_full_name.replace(/\//g, "_");
     const metadata = await this.loadMetadata(indexName);
 
     if (!metadata) {
-      throw new Error(`Index not found for ${payload.repo_full_name}. Run full index first.`);
+      throw new Error(
+        `Index not found for ${payload.repo_full_name}. Run full index first.`
+      );
     }
 
     const docsToAdd: DocumentInfo[] = [];
@@ -286,7 +331,11 @@ export class MossClient {
     if (payload.files?.length) {
       for (const file of payload.files) {
         // Handle both content and content_base64
-        const content = file.content || (file.content_base64 ? Buffer.from(file.content_base64, "base64").toString("utf-8") : "");
+        const content =
+          file.content ||
+          (file.content_base64
+            ? Buffer.from(file.content_base64, "base64").toString("utf-8")
+            : "");
 
         if (!content) {
           console.warn(`Skipping file ${file.path}: no content provided`);
@@ -311,7 +360,7 @@ export class MossClient {
         docsToAdd.push(...chunks);
         metadata.files[file.path] = {
           hash: newHash,
-          chunks: chunks.map(c => c.id)
+          chunks: chunks.map((c) => c.id),
         };
         filesProcessed++;
       }
@@ -332,17 +381,23 @@ export class MossClient {
       metadata.updated_at = new Date().toISOString();
       await this.saveMetadata(indexName, metadata);
 
-      console.log(`Incremental update: ${filesProcessed} files, ${docsToAdd.length} chunks added, ${docIdsToDelete.length} chunks deleted`);
+      console.log(
+        `Incremental update: ${filesProcessed} files, ${docsToAdd.length} chunks added, ${docIdsToDelete.length} chunks deleted`
+      );
 
       return {
         status: "success",
         repo: payload.repo_full_name,
         files_indexed: filesProcessed,
-        message: `Updated ${filesProcessed} files`
+        message: `Updated ${filesProcessed} files`,
       };
     } catch (error) {
       console.error("Failed to update index:", error);
-      throw new Error(`Failed to update index: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to update index: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
@@ -372,11 +427,15 @@ export class MossClient {
     let indexesToSearch: string[] = [];
     if (repos.length === 0) {
       const allIndexes = await this.moss.listIndexes();
-      indexesToSearch = allIndexes.map(idx => idx.name);
-      process.stderr.write(`[MossClient] No repos specified, searching ${indexesToSearch.length} available indexes\n`);
+      indexesToSearch = allIndexes.map((idx) => idx.name);
+      process.stderr.write(
+        `[MossClient] No repos specified, searching ${indexesToSearch.length} available indexes\n`
+      );
     } else {
-      indexesToSearch = repos.map(r => r.replace(/\//g, "_"));
-      process.stderr.write(`[MossClient] Searching repos: ${repos.join(', ')}\n`);
+      indexesToSearch = repos.map((r) => r.replace(/\//g, "_"));
+      process.stderr.write(
+        `[MossClient] Searching repos: ${repos.join(", ")}\n`
+      );
     }
 
     const allResults: SearchResult[] = [];
@@ -388,7 +447,9 @@ export class MossClient {
           process.stderr.write(`[MossClient] Loading index: ${indexName}...\n`);
           await this.moss.loadIndex(indexName);
           this.loadedIndexes.add(indexName);
-          process.stderr.write(`[MossClient] Index loaded! Subsequent queries will be faster.\n`);
+          process.stderr.write(
+            `[MossClient] Index loaded! Subsequent queries will be faster.\n`
+          );
         }
 
         process.stderr.write(`[MossClient] Querying index: ${indexName}\n`);
@@ -405,29 +466,48 @@ export class MossClient {
         );
         const queryDuration = Date.now() - queryStart;
 
-        process.stderr.write(`[MossClient] Query completed in ${queryDuration}ms, found ${mossResult.docs.length} results\n`);
+        process.stderr.write(
+          `[MossClient] Query completed in ${queryDuration}ms, found ${mossResult.docs.length} results\n`
+        );
 
         // Log raw Moss response details
         if (mossResult.docs.length > 0) {
-          process.stderr.write(`[MossClient] Raw Moss response (first 3 results):\n`);
+          process.stderr.write(
+            `[MossClient] Raw Moss response (first 3 results):\n`
+          );
           mossResult.docs.slice(0, 3).forEach((doc, idx) => {
             process.stderr.write(`  Result ${idx + 1}:\n`);
             process.stderr.write(`    - Score: ${doc.score}\n`);
-            process.stderr.write(`    - File: ${doc.metadata?.file_path || 'N/A'}\n`);
-            process.stderr.write(`    - Lines: ${doc.metadata?.line_start || 'N/A'}-${doc.metadata?.line_end || 'N/A'}\n`);
-            process.stderr.write(`    - Content preview: ${doc.text.substring(0, 100).replace(/\n/g, ' ')}...\n`);
+            process.stderr.write(
+              `    - File: ${doc.metadata?.file_path || "N/A"}\n`
+            );
+            process.stderr.write(
+              `    - Lines: ${doc.metadata?.line_start || "N/A"}-${
+                doc.metadata?.line_end || "N/A"
+              }\n`
+            );
+            process.stderr.write(
+              `    - Content preview: ${doc.text
+                .substring(0, 100)
+                .replace(/\n/g, " ")}...\n`
+            );
           });
         }
 
         // Convert Moss results to our format
         for (const doc of mossResult.docs) {
           const filePath = doc.metadata?.file_path || "";
-          const lineStart = doc.metadata?.line_start ? parseInt(doc.metadata.line_start) : undefined;
-          const lineEnd = doc.metadata?.line_end ? parseInt(doc.metadata.line_end) : undefined;
+          const lineStart = doc.metadata?.line_start
+            ? parseInt(doc.metadata.line_start)
+            : undefined;
+          const lineEnd = doc.metadata?.line_end
+            ? parseInt(doc.metadata.line_end)
+            : undefined;
 
           // Try to get repo name from metadata
           const metadata = await this.loadMetadata(indexName);
-          const repoName = metadata?.repo_full_name || indexName.replace(/_/g, "/");
+          const repoName =
+            metadata?.repo_full_name || indexName.replace(/_/g, "/");
 
           allResults.push({
             repo: repoName,
@@ -437,11 +517,13 @@ export class MossClient {
             line_end: lineEnd,
             content: doc.text,
             snippet: doc.text.substring(0, 300),
-            score: doc.score
+            score: doc.score,
           });
         }
       } catch (error) {
-        process.stderr.write(`[MossClient] Failed to search index ${indexName}: ${error}\n`);
+        process.stderr.write(
+          `[MossClient] Failed to search index ${indexName}: ${error}\n`
+        );
         // Continue with other indexes
       }
     }
@@ -450,28 +532,39 @@ export class MossClient {
     allResults.sort((a, b) => (b.score || 0) - (a.score || 0));
     const finalResults = allResults.slice(0, maxResults);
 
-    process.stderr.write(`[MossClient] Total results before filtering: ${allResults.length}\n`);
-    process.stderr.write(`[MossClient] Results after limiting to ${maxResults}: ${finalResults.length}\n`);
+    process.stderr.write(
+      `[MossClient] Total results before filtering: ${allResults.length}\n`
+    );
+    process.stderr.write(
+      `[MossClient] Results after limiting to ${maxResults}: ${finalResults.length}\n`
+    );
 
     // Filter by file types if specified
-    const filteredResults = params.file_types && params.file_types.length > 0
-      ? finalResults.filter(r => {
-          const ext = r.file_path?.split(".").pop();
-          return ext && params.file_types?.includes(ext);
-        })
-      : finalResults;
+    const filteredResults =
+      params.file_types && params.file_types.length > 0
+        ? finalResults.filter((r) => {
+            const ext = r.file_path?.split(".").pop();
+            return ext && params.file_types?.includes(ext);
+          })
+        : finalResults;
 
     if (params.file_types && params.file_types.length > 0) {
-      process.stderr.write(`[MossClient] Filtered by file types [${params.file_types.join(', ')}]: ${filteredResults.length} results\n`);
+      process.stderr.write(
+        `[MossClient] Filtered by file types [${params.file_types.join(
+          ", "
+        )}]: ${filteredResults.length} results\n`
+      );
     }
 
     const duration = Date.now() - startTime;
-    process.stderr.write(`[MossClient] Search completed in ${duration}ms, returning ${filteredResults.length} results\n`);
+    process.stderr.write(
+      `[MossClient] Search completed in ${duration}ms, returning ${filteredResults.length} results\n`
+    );
 
     return {
       results: filteredResults,
       total: filteredResults.length,
-      duration_ms: duration
+      duration_ms: duration,
     };
   }
 
@@ -488,8 +581,8 @@ export class MossClient {
       metadata: {
         url: doc.url,
         title: doc.title || "",
-        source: "web"
-      }
+        source: "web",
+      },
     }));
 
     try {
@@ -508,7 +601,7 @@ export class MossClient {
         repo_full_name: indexName,
         files: {},
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
       await this.saveMetadata(indexName, metadata);
 
@@ -516,11 +609,15 @@ export class MossClient {
         status: "success",
         url: payload.url,
         docs_indexed: docs.length,
-        message: `Indexed ${docs.length} documents from ${payload.url}`
+        message: `Indexed ${docs.length} documents from ${payload.url}`,
       };
     } catch (error) {
       console.error("Failed to index web content:", error);
-      throw new Error(`Failed to index web content: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to index web content: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
@@ -540,11 +637,11 @@ export class MossClient {
     if (!metadata) {
       return false;
     }
-    
+
     // Also verify the index actually exists in Moss
     try {
       const indexes = await this.moss.listIndexes();
-      return indexes.some(idx => idx.name === indexName);
+      return indexes.some((idx) => idx.name === indexName);
     } catch {
       return false;
     }

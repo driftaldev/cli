@@ -129,11 +129,17 @@ export function registerIndexDocTool(
     async (params) => {
       const parsed = IndexDocInputSchema.parse(params ?? {});
 
-      // Initialize Moss client with credentials from config or environment
+      // Initialize Moss client - try backend first, fallback to config/env
       const indexDir = config.moss?.index_directory || ".scout-code/indexes";
-      const projectId = config.moss?.project_id; // Optional, falls back to env
-      const projectKey = config.moss?.project_key; // Optional, falls back to env
-      const client = new MossClient(projectId, projectKey, indexDir);
+      let client: MossClient;
+      try {
+        client = await MossClient.fromBackend(indexDir);
+      } catch (error) {
+        // Fallback to config/env if backend fetch fails
+        const projectId = config.moss?.project_id;
+        const projectKey = config.moss?.project_key;
+        client = new MossClient(projectId, projectKey, indexDir);
+      }
 
       // Crawl the URL to get content
       const document = await fetchSinglePage(parsed.url);

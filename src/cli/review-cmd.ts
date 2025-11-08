@@ -295,19 +295,25 @@ export function createReviewCommand(): Command {
         // 2. Auto-index and start watcher (non-blocking)
         spinner.text = "Ensuring codebase is indexed...";
         const repoPath = process.cwd();
-        
+
         const indexDir = config.moss?.index_directory || ".scout-code/indexes";
-        const projectId = config.moss?.project_id;
-        const projectKey = config.moss?.project_key;
-        const mossClient = new MossClient(projectId, projectKey, indexDir);
-        
+        let mossClient: MossClient;
+        try {
+          mossClient = await MossClient.fromBackend(indexDir);
+        } catch (error) {
+          // Fallback to config/env if backend fetch fails
+          const projectId = config.moss?.project_id;
+          const projectKey = config.moss?.project_key;
+          mossClient = new MossClient(projectId, projectKey, indexDir);
+        }
+
         // This will index if needed and start watching in background
         const repoName = await ensureIndexedAndWatching(
           repoPath,
           config,
           mossClient
         );
-        
+
         spinner.succeed(`Codebase indexed and watching for changes`);
 
         // Ensure review config exists with defaults

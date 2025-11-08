@@ -36,7 +36,7 @@ export interface TypeInfo {
  */
 export class ContextEnricher {
   private depGraphBuilder: DependencyGraphBuilder;
-  private mossClient: MossClient;
+  private mossClient: MossClient | null = null;
   private options: Required<ContextEnricherOptions>;
   private fileCache: Map<string, string> = new Map();
 
@@ -49,7 +49,24 @@ export class ContextEnricher {
     };
 
     this.depGraphBuilder = new DependencyGraphBuilder(options.repoPath);
-    this.mossClient = new MossClient();
+  }
+
+  /**
+   * Lazy initialization of MossClient - tries backend first, falls back to env
+   */
+  private async getMossClient(): Promise<MossClient> {
+    if (this.mossClient) {
+      return this.mossClient;
+    }
+
+    try {
+      this.mossClient = await MossClient.fromBackend();
+    } catch (error) {
+      // Fallback to env/config if backend fetch fails
+      this.mossClient = new MossClient();
+    }
+
+    return this.mossClient;
   }
 
   /**
@@ -390,7 +407,8 @@ export class ContextEnricher {
       logger.debug(`[ContextEnricher] Searching Moss with query: "${query.substring(0, 50)}..."`);
 
       // Search Moss index
-      const searchResults = await this.mossClient.search({
+      const mossClient = await this.getMossClient();
+      const searchResults = await mossClient.search({
         query,
         repos: [this.options.repoName],
         max_results: this.options.maxSimilarPatterns * 2, // Get more, filter later

@@ -9,7 +9,7 @@ import { MossClient } from "../core/indexer/moss-client.js";
 import { logger } from "../utils/logger.js";
 import {
   loadSavedRepoName,
-  RepoNameNotConfiguredError
+  RepoNameNotConfiguredError,
 } from "../utils/repo-name-store.js";
 import { ensureIndexedAndWatching } from "./index-cmd.js";
 
@@ -22,16 +22,20 @@ function formatSearchResults(results: any[], queryTime: number): string {
     return chalk.yellow("\n❌ No results found. Try rephrasing your query.\n");
   }
 
-  let output = chalk.green(`\n⚡ ${queryTime}ms`) + chalk.gray(` | Found ${results.length} results\n\n`);
+  let output =
+    chalk.green(`\n⚡ ${queryTime}ms`) +
+    chalk.gray(` | Found ${results.length} results\n\n`);
 
   for (const result of results) {
     const score = Math.round((result.score || 0) * 100);
-    const scoreColor = score > 80 ? chalk.green : score > 60 ? chalk.yellow : chalk.gray;
+    const scoreColor =
+      score > 80 ? chalk.green : score > 60 ? chalk.yellow : chalk.gray;
 
     // File path with line numbers
-    const location = result.line_start && result.line_end
-      ? `${result.file_path}:${result.line_start}-${result.line_end}`
-      : result.file_path || "unknown";
+    const location =
+      result.line_start && result.line_end
+        ? `${result.file_path}:${result.line_start}-${result.line_end}`
+        : result.file_path || "unknown";
 
     output += chalk.blue("📄 ") + chalk.cyan(location);
     output += " " + scoreColor(`(${score}%)\n`);
@@ -53,13 +57,15 @@ function formatSearchResults(results: any[], queryTime: number): string {
       const snippet = previewLines.join("\n");
       const indentedSnippet = snippet
         .split("\n")
-        .map(line => "   " + chalk.gray(line.substring(0, 100))) // Truncate very long lines
+        .map((line) => "   " + chalk.gray(line.substring(0, 100))) // Truncate very long lines
         .join("\n");
       output += indentedSnippet;
 
       // Show if there's more content
       if (lines.length > previewLines.length) {
-        output += chalk.dim("\n   ... (" + (lines.length - previewLines.length) + " more lines)");
+        output += chalk.dim(
+          "\n   ... (" + (lines.length - previewLines.length) + " more lines)"
+        );
       }
       output += "\n\n";
     }
@@ -90,7 +96,7 @@ async function handleQuery(
 ): Promise<void> {
   const spinner = ora({
     text: "Searching...",
-    color: "cyan"
+    color: "cyan",
   }).start();
 
   try {
@@ -98,7 +104,7 @@ async function handleQuery(
     const response = await client.search({
       query,
       repos: [repoName],
-      max_results: maxResults
+      max_results: maxResults,
     });
     const endTime = performance.now();
     const queryTime = Math.round(endTime - startTime);
@@ -124,7 +130,7 @@ async function startChatSession(
   showWelcome();
 
   // Handle Ctrl+C gracefully
-  rl.on('SIGINT', () => {
+  rl.on("SIGINT", () => {
     console.log(chalk.gray("\n\nGoodbye! 👋\n"));
     rl.close();
     process.exit(0);
@@ -161,7 +167,9 @@ async function startChatSession(
         await handleQuery(client, trimmedQuery, repoName, maxResults);
       } catch (queryError) {
         // Catch errors in individual queries but keep the loop running
-        console.log(chalk.red("\n❌ Error: ") + (queryError as Error).message + "\n");
+        console.log(
+          chalk.red("\n❌ Error: ") + (queryError as Error).message + "\n"
+        );
       }
     }
   } finally {
@@ -173,24 +181,32 @@ export function registerChatCommand(program: Command): void {
   program
     .command("chat")
     .description("Interactive chat with your codebase")
-    .option("-n, --max-results <number>", "Maximum number of results to show", "5")
+    .option(
+      "-n, --max-results <number>",
+      "Maximum number of results to show",
+      "5"
+    )
     .action(async (options) => {
       try {
         const config = await loadConfig();
         const repoRoot = process.cwd();
 
-        // Initialize Moss client
+        // Initialize Moss client - try backend first, fallback to config/env
         const indexDir = config.moss?.index_directory || ".scout-code/indexes";
-        const projectId = config.moss?.project_id;
-        const projectKey = config.moss?.project_key;
-
         let client: MossClient;
         try {
-          client = new MossClient(projectId, projectKey, indexDir);
+          client = await MossClient.fromBackend(indexDir);
         } catch (error) {
-          logger.error((error as Error).message);
-          process.exitCode = 1;
-          return;
+          // Fallback to config/env if backend fetch fails
+          const projectId = config.moss?.project_id;
+          const projectKey = config.moss?.project_key;
+          try {
+            client = new MossClient(projectId, projectKey, indexDir);
+          } catch (fallbackError) {
+            logger.error((fallbackError as Error).message);
+            process.exitCode = 1;
+            return;
+          }
         }
 
         // Auto-index and start watcher if needed

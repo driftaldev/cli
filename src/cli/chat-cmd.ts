@@ -11,6 +11,7 @@ import {
   loadSavedRepoName,
   RepoNameNotConfiguredError
 } from "../utils/repo-name-store.js";
+import { ensureIndexedAndWatching } from "./index-cmd.js";
 
 interface ChatOptions {
   maxResults?: number;
@@ -178,25 +179,6 @@ export function registerChatCommand(program: Command): void {
         const config = await loadConfig();
         const repoRoot = process.cwd();
 
-        // Get repository name
-        let repoName: string;
-        try {
-          const savedName = await loadSavedRepoName(repoRoot);
-          if (!savedName) {
-            throw new RepoNameNotConfiguredError(repoRoot);
-          }
-          repoName = savedName;
-        } catch (error) {
-          if (error instanceof RepoNameNotConfiguredError) {
-            logger.error(
-              "Repository not initialized. Run `scout-code init` first."
-            );
-            process.exitCode = 1;
-            return;
-          }
-          throw error;
-        }
-
         // Initialize Moss client
         const indexDir = config.moss?.index_directory || ".scout-code/indexes";
         const projectId = config.moss?.project_id;
@@ -211,15 +193,12 @@ export function registerChatCommand(program: Command): void {
           return;
         }
 
-        // Check if index exists
-        const healthy = await client.health();
-        if (!healthy) {
-          logger.error(
-            "No indexes found. Run `scout-code index` to create an index first."
-          );
-          process.exitCode = 1;
-          return;
-        }
+        // Auto-index and start watcher if needed
+        const repoName = await ensureIndexedAndWatching(
+          repoRoot,
+          config,
+          client
+        );
 
         // Parse max results
         const maxResults = parseInt(options.maxResults, 10);

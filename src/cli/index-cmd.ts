@@ -6,7 +6,7 @@ import { stdin as input, stdout as output } from "node:process";
 import chokidar from "chokidar";
 import ora from "ora";
 
-import { loadConfig } from "../config/loader.js";
+import { loadConfig, type ScoutConfig } from "../config/loader.js";
 import { scanFiles } from "../core/indexer/file-scanner.js";
 import {
   type FullIndexRequest,
@@ -163,6 +163,60 @@ function setupWatcher(context: WatchContext) {
   });
 
   logger.info(`Watching ${repoName} for changes...`);
+}
+
+/**
+ * Ensures the repository is indexed and watching for changes.
+ * This is called automatically by commands that need indexing.
+ * Returns the repo name and starts a background watcher.
+ */
+export async function ensureIndexedAndWatching(
+  repoPath: string,
+  config: ScoutConfig,
+  client: MossClient
+): Promise<string> {
+  // Get or prompt for repo name
+  let repoName = await loadSavedRepoName(repoPath);
+  
+  if (!repoName) {
+    // Non-interactive mode: use a default name based on directory
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      const dirName = path.basename(path.resolve(repoPath));
+      repoName = dirName || "default";
+      await saveRepoName(repoPath, repoName);
+      logger.info(`Using default repo name: ${repoName}`);
+    } else {
+      // Interactive mode: prompt user
+      repoName = await promptRepoName(repoPath);
+    }
+  }
+
+  // Check if already indexed
+  const isIndexed = await client.isIndexed(repoName);
+  
+  if (!isIndexed) {
+    logger.info(`Index not found for ${repoName}. Auto-indexing...`);
+    await performIndex(
+      repoName,
+      repoPath,
+      config.indexing.file_extensions,
+      config.indexing.exclude_patterns,
+      client
+    );
+  } else {
+    logger.debug(`Index already exists for ${repoName}`);
+  }
+
+  // Always start watcher in background (non-blocking)
+  setupWatcher({
+    repoName,
+    root: repoPath,
+    extensions: config.indexing.file_extensions,
+    excludePatterns: config.indexing.exclude_patterns,
+    client
+  });
+
+  return repoName;
 }
 
 export function registerIndexCommand(program: Command): void {

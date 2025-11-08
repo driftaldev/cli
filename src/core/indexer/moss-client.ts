@@ -533,4 +533,20 @@ export class MossClient {
       return false;
     }
   }
+
+  async isIndexed(repoFullName: string): Promise<boolean> {
+    const indexName = repoFullName.replace(/\//g, "_");
+    const metadata = await this.loadMetadata(indexName);
+    if (!metadata) {
+      return false;
+    }
+    
+    // Also verify the index actually exists in Moss
+    try {
+      const indexes = await this.moss.listIndexes();
+      return indexes.some(idx => idx.name === indexName);
+    } catch {
+      return false;
+    }
+  }
 }

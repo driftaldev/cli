@@ -11,13 +11,15 @@ import {
   getDiff,
   getCommitDiff,
 } from "../utils/git.js";
-import { loadLLMConfig } from "../config/loader.js";
+import { loadLLMConfig, loadConfig } from "../config/loader.js";
 import { CodeReviewer } from "../core/review/reviewer.js";
 import { TextFormatter } from "../core/review/formatters/text-formatter.js";
 import { selectFiles } from "../utils/file-selector.js";
 import type { LLMConfig, ReviewConfig } from "../config/schema.js";
 import type { ReviewIssue } from "../core/review/issue.js";
 import ReviewSummary from "../ui/review/ReviewSummary.js";
+import { ensureIndexedAndWatching } from "./index-cmd.js";
+import { MossClient } from "../core/indexer/moss-client.js";
 
 let inkModule: any | null = null;
 
@@ -269,6 +271,8 @@ export function createReviewCommand(): Command {
         // 1. Load configuration
         spinner.text = "Loading configuration...";
 
+        const config = await loadConfig();
+
         let llmConfig: LLMConfig;
         try {
           llmConfig = await loadLLMConfig();
@@ -287,6 +291,24 @@ export function createReviewCommand(): Command {
           );
           process.exit(1);
         }
+
+        // 2. Auto-index and start watcher (non-blocking)
+        spinner.text = "Ensuring codebase is indexed...";
+        const repoPath = process.cwd();
+        
+        const indexDir = config.moss?.index_directory || ".scout-code/indexes";
+        const projectId = config.moss?.project_id;
+        const projectKey = config.moss?.project_key;
+        const mossClient = new MossClient(projectId, projectKey, indexDir);
+        
+        // This will index if needed and start watching in background
+        const repoName = await ensureIndexedAndWatching(
+          repoPath,
+          config,
+          mossClient
+        );
+        
+        spinner.succeed(`Codebase indexed and watching for changes`);
 
         // Ensure review config exists with defaults
         const reviewConfig: ReviewConfig = {
@@ -328,9 +350,6 @@ export function createReviewCommand(): Command {
             },
           },
         };
-
-        // 2. Get the repository path (assume current directory)
-        const repoPath = process.cwd();
 
         // 3. Handle file selection with @ prefix
         let selectedFiles: string[] | null = null;

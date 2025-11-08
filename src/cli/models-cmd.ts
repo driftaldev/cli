@@ -58,7 +58,7 @@ async function handleModelsList() {
     const primary = status.tokens?.selectedModels?.primary;
     const fallback = status.tokens?.selectedModels?.fallback;
 
-    console.log(chalk.cyan("\n🤖 Current Model Configuration\n"));
+    console.log(chalk.cyan("\nCurrent Model Configuration\n"));
 
     if (primary) {
       const primaryInfo = SUPPORTED_MODELS[primary as ModelKey];
@@ -110,7 +110,7 @@ async function handleModelsSelect() {
       value: id
     }));
 
-    console.log(chalk.cyan("\n🤖 Update Model Selection\n"));
+    console.log(chalk.cyan("\nUpdate Model Selection\n"));
 
     // Select primary model
     const initialPrimary = currentPrimary
@@ -184,7 +184,7 @@ async function handleModelsSelect() {
  * Show available models
  */
 async function handleModelsAvailable() {
-  console.log(chalk.cyan("\n🤖 Available Models\n"));
+  console.log(chalk.cyan("\nAvailable Models\n"));
 
   const anthropicModels = Object.entries(SUPPORTED_MODELS)
     .filter(([_, info]) => info.provider === "anthropic");

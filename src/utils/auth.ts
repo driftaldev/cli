@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import * as http from "http";
-import { AuthTokens, saveAuthTokens } from "./token-manager.js";
+import { AuthTokens, saveAuthTokens, loadAuthTokens } from "./token-manager.js";
 import { logger } from "./logger.js";
 
 // Default auth endpoint - can be overridden via env var
@@ -244,10 +244,7 @@ async function startCallbackServer(state: string): Promise<{
 /**
  * Initiate browser-based OAuth login flow
  */
-export async function initiateLogin(selectedModels?: {
-  primary: string;
-  fallback?: string;
-}): Promise<AuthResult> {
+export async function initiateLogin(): Promise<AuthResult> {
   const state = generateState();
 
   // Start local callback server first
@@ -257,13 +254,6 @@ export async function initiateLogin(selectedModels?: {
   const authUrl = new URL(AUTH_CLI_URL);
   authUrl.searchParams.set("state", state);
   authUrl.searchParams.set("callback_port", port.toString());
-
-  if (selectedModels) {
-    authUrl.searchParams.set("primary_model", selectedModels.primary);
-    if (selectedModels.fallback) {
-      authUrl.searchParams.set("fallback_model", selectedModels.fallback);
-    }
-  }
 
   logger.info("\n🔐 Opening browser for authentication...");
   logger.info(
@@ -283,11 +273,6 @@ export async function initiateLogin(selectedModels?: {
   const result = await resultPromise;
 
   if (result.success && result.tokens) {
-    // Save selected models to tokens
-    if (selectedModels) {
-      result.tokens.selectedModels = selectedModels;
-    }
-
     // Save tokens to disk
     await saveAuthTokens(result.tokens);
   }
@@ -302,6 +287,9 @@ export async function refreshAccessToken(
   refreshToken: string
 ): Promise<AuthResult> {
   try {
+    // Load existing tokens to preserve model preferences and user email
+    const existingTokens = await loadAuthTokens();
+
     const response = await fetch(buildAuthApiUrl("/auth/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -324,7 +312,10 @@ export async function refreshAccessToken(
       expiresAt: data.expires_in
         ? Date.now() + data.expires_in * 1000
         : undefined,
-      createdAt: Date.now(),
+      // Preserve existing model preferences and user email
+      selectedModels: existingTokens?.selectedModels,
+      userEmail: existingTokens?.userEmail,
+      createdAt: existingTokens?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
 

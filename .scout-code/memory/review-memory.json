@@ -2226,5 +2226,1192 @@
       "tags": []
     },
     "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "d7935cf9-e1e4-45df-a456-ad40f412156f",
+    "timestamp": 1762638453222,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used in spawning a child process, which can lead to command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize and validate all user inputs used in command execution or use more secure APIs.",
+        "code": "this.process = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8765'], { cwd, detached: true, stdio: 'ignore', shell: false });"
+      },
+      "rationale": "Using user input directly in the spawn function without proper sanitization can allow an attacker to execute arbitrary commands on the host system.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "d35d0259-a965-4e1a-ae8c-23326947fc6b",
+    "timestamp": 1762638453222,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Incorrect condition check for missing environment variables",
+      "description": "The condition checks for missing environment variables are incorrect because they are only evaluated when 'config.cloud?.api_key' is not set, which is not the intended logic.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 31
+      },
+      "problematicPath": "The condition 'cloudAuth.missingIndexerEnvVar && !config.cloud?.api_key' should be checked regardless of the API key presence.",
+      "edgeCases": [
+        "API key is set but environment variables are missing"
+      ],
+      "suggestion": {
+        "description": "Separate the checks for missing environment variables from the API key check",
+        "code": "if (cloudAuth.missingIndexerEnvVar) {\n  logger.warn(`Cloud hosting enabled but environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`);\n}\nif (cloudAuth.missingRedisEnvVar) {\n  logger.warn(`Hosted Redis configured but missing secret environment variable(s): ${cloudAuth.missingRedisEnvVar}.`);\n}"
+      },
+      "rationale": "The current logic might skip important warnings about missing environment variables if an API key is set, potentially leading to runtime failures.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "94b96824-ce9e-47c7-a3dc-5dd0667eb032",
+    "timestamp": 1762638453222,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Sensitive Data Exposure through logs",
+      "description": "Sensitive information such as API keys and environment variables are logged, which can lead to information disclosure if logs are improperly handled or accessed.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 25
+      },
+      "cwe": "CWE-532",
+      "suggestion": {
+        "description": "Avoid logging sensitive information directly. Use placeholders or mask the sensitive parts of the data.",
+        "code": "logger.warn(`Cloud hosting enabled but environment variable for indexer is not set. Requests may fail.`);"
+      },
+      "rationale": "Logging sensitive information can expose it to unauthorized parties if log files are not secured or if logs are improperly monitored.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "2aff3c0c-273a-434f-98ad-1d921ea5a2c3",
+    "timestamp": 1762638453222,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejection",
+      "description": "The 'action' handler in 'registerDaemonCommand' does not handle exceptions that might be thrown by the 'start', 'stop', or 'status' methods.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "problematicPath": "If any of the daemon management methods throw an error, it will result in an unhandled promise rejection.",
+      "edgeCases": [
+        "Network issues during 'start', 'stop', or 'status'",
+        "Configuration load failure"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around the calls to 'start', 'stop', and 'status' to handle potential errors",
+        "code": "try {\n  await manager.start();\n} catch (error) {\n  logger.error(`Failed to start daemon: ${error.message}`);\n}\n// Repeat for 'stop' and 'status'"
+      },
+      "rationale": "Handling errors gracefully improves the robustness of the application and provides better user feedback.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ef5f3955-dd1f-425d-9e8a-012bcf16e889",
+    "timestamp": 1762638453222,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Inconsistent error handling in 'waitForHealth'",
+      "description": "The 'waitForHealth' method throws an error after retries are exhausted, but this exception is not caught or handled in the 'start' method.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 123
+      },
+      "problematicPath": "If 'waitForHealth' fails, the error propagates unhandled.",
+      "edgeCases": [
+        "Indexer service fails to become healthy within the retry limit"
+      ],
+      "suggestion": {
+        "description": "Add error handling for the 'waitForHealth' call in the 'start' method",
+        "code": "try {\n  await this.waitForHealth(client);\n} catch (error) {\n  logger.error(`Failed to verify indexer health: ${error.message}`);\n  throw error;\n}"
+      },
+      "rationale": "Proper error handling ensures that the application can respond appropriately to failures, potentially by performing cleanup or alerting the user.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "26d77084-4a32-4e26-90fc-977771f87145",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-controlled data",
+      "description": "The method 'get' in RedisCache class deserializes data from Redis without validating the content, which could lead to attacks such as code execution if the data is tampered.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement input validation or sanitization to ensure the integrity of the data before deserializing it.",
+        "code": "if (isValid(value)) { return JSON.parse(value) as T; } else { throw new Error('Invalid data'); }"
+      },
+      "rationale": "Deserializing untrusted data without validation can lead to security vulnerabilities such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "41aee96f-0aa4-4c8a-be33-5019d60608d7",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficient JSON operations",
+      "description": "JSON.parse and JSON.stringify are used in get and set methods which can be inefficient for large objects.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31,
+        "endLine": 39
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Consider using more efficient serialization methods if objects are large or complex.",
+        "code": "Use libraries like BSON or a custom efficient serialization method for large or complex objects."
+      },
+      "alternative": "Use BSON or similar for serialization",
+      "rationale": "JSON operations can be costly in terms of CPU usage for large or complex objects, affecting performance.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "2143e528-0f98-4b90-a87d-2c01cf0c9775",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential JSON.parse failure not handled",
+      "description": "The method JSON.parse is used without a try-catch block, which can throw an exception if the value is not valid JSON.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "If the value retrieved from Redis is not valid JSON, JSON.parse will throw an error.",
+      "edgeCases": [
+        "Corrupted JSON data",
+        "Non-JSON data stored under a key"
+      ],
+      "suggestion": {
+        "description": "Wrap JSON.parse in a try-catch block to handle potential exceptions.",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (e) {\n  console.error('Failed to parse JSON:', e);\n  return undefined;\n}"
+      },
+      "rationale": "Handling JSON.parse errors prevents the application from crashing due to unexpected data formats in the cache.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "7139a778-fb88-43bf-ac1f-b017f6a95342",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No error handling in connect, disconnect, set, and delete methods",
+      "description": "The async methods connect, disconnect, set, and delete do not handle errors that might occur during Redis operations.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 19,
+        "endLine": 43
+      },
+      "problematicPath": "Any network or Redis-specific errors are not caught, which could lead to unhandled promise rejections.",
+      "edgeCases": [
+        "Network issues",
+        "Redis server down",
+        "Invalid commands"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around Redis operations to handle errors gracefully.",
+        "code": "try {\n  await this.client.connect();\n} catch (error) {\n  console.error('Failed to connect to Redis:', error);\n}"
+      },
+      "rationale": "Proper error handling in asynchronous operations prevents unhandled promise rejections and improves the robustness of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c4516a5f-7ba1-4b1e-ba3c-4da2a9091118",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "low",
+      "title": "Lack of connection status checks before disconnect",
+      "description": "The 'disconnect' method in RedisCache class does not check if the connection is already disconnected before attempting to quit, which could lead to unnecessary errors or exceptions.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 25
+      },
+      "cwe": "CWE-754",
+      "suggestion": {
+        "description": "Check the connection status before attempting to disconnect.",
+        "code": "if (this.client.status !== 'end' && this.client.status !== 'disconnected') { await this.client.quit(); }"
+      },
+      "rationale": "Proper handling of connection states ensures smoother operation and error handling.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "fa666ef8-6e33-4f32-a82d-95fb3c413f46",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Redundant connection checks in connect method",
+      "description": "The connect method checks the client status before attempting to connect, which might be redundant as the ioredis library handles reconnection logic internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 21,
+        "endLine": 25
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove the status check and rely on ioredis's internal reconnection mechanisms.",
+        "code": "await this.client.connect();"
+      },
+      "alternative": "Rely on internal library mechanisms",
+      "rationale": "The ioredis library is designed to handle connection issues internally, making explicit checks potentially unnecessary and simplifying the code.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "cb56baf8-d6c1-4fb7-a6d5-2c0b6f5d5773",
+    "timestamp": 1762641957152,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Redundant check for client status in disconnect method",
+      "description": "The check for the client status being 'end' before calling quit is redundant since ioredis handles this internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 27
+      },
+      "problematicPath": "Calling quit on a client with status 'end' does not cause any issues as ioredis manages this state internally.",
+      "edgeCases": [
+        "Client already disconnected"
+      ],
+      "suggestion": {
+        "description": "Remove the redundant status check in the disconnect method.",
+        "code": "await this.client.quit();"
+      },
+      "rationale": "Simplifying the code by removing unnecessary checks can improve readability and maintainability.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "45fa0a91-5f70-437e-a977-dab087a4ebbd",
+    "timestamp": 1762642296625,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-supplied data",
+      "description": "The method 'get' in RedisCache class deserializes data from Redis without validating the integrity or authenticity of the data. This can lead to attacks such as code execution if the deserialized data can be tampered with.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement integrity checks and potentially encryption to ensure the data being deserialized is not tampered with. Consider using secure serialization libraries that inherently protect against deserialization flaws.",
+        "code": "const value = await this.client.get(key);\nif (!value) {\n  return undefined;\n}\n// Implement integrity check here\nreturn JSON.parse(value) as T;"
+      },
+      "rationale": "Deserializing untrusted data without proper security checks can lead to serious vulnerabilities such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "3464bbcf-eb2e-40ed-bf9c-b79a5fc29a67",
+    "timestamp": 1762642296625,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficient JSON serialization/deserialization",
+      "description": "The methods for setting and getting cache entries involve JSON serialization and deserialization, which can be computationally expensive.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34,
+        "endLine": 36
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Consider alternatives to JSON for serialization if the stored objects are large or complex, such as Protocol Buffers or custom serialization that might be more performance-efficient.",
+        "code": "await this.client.set(key, serialize(value), 'EX', ttl); // serialize is a more efficient custom function"
+      },
+      "alternative": "Use more efficient serialization methods",
+      "rationale": "JSON.parse and JSON.stringify can be slow for large objects or high throughput, impacting performance.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a504c41f-62b0-4e89-a662-5c77df842cad",
+    "timestamp": 1762642296625,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential JSON.parse failure",
+      "description": "JSON.parse can throw an error if the value is not valid JSON, which is not handled in the get method.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "When the value returned from Redis is not valid JSON",
+      "edgeCases": [
+        "Corrupted JSON data",
+        "Non-JSON data stored under the same key"
+      ],
+      "suggestion": {
+        "description": "Add try-catch block around JSON.parse to handle potential exceptions",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (error) {\n  console.error('Failed to parse JSON:', error);\n  return undefined;\n}"
+      },
+      "rationale": "Uncaught exceptions from JSON.parse can lead to application crashes or unhandled promise rejections.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "f96c270f-730c-4080-9af3-48660bfcb8fc",
+    "timestamp": 1762642296625,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No error handling in connect, disconnect, set, and delete methods",
+      "description": "The connect, disconnect, set, and delete methods do not handle errors that may occur during Redis operations.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "problematicPath": "Any network or Redis-specific errors during operations",
+      "edgeCases": [
+        "Network issues",
+        "Redis server down",
+        "Permission issues"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks to handle errors and possibly retry or log them",
+        "code": "try {\n  await this.client.connect();\n} catch (error) {\n  console.error('Failed to connect to Redis:', error);\n  throw error;\n}"
+      },
+      "rationale": "Handling errors in asynchronous operations prevents unhandled promise rejections and allows for better error recovery and logging.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "bd609dce-d4fa-43bf-b4da-5ae4341c7a9f",
+    "timestamp": 1762642296625,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Inconsistent handling of Redis client status",
+      "description": "The disconnect method checks for a status of 'end' to avoid calling quit, but does not handle other non-active statuses such as 'reconnecting' or 'wait'.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 26
+      },
+      "problematicPath": "Client status is 'reconnecting' or 'wait'",
+      "edgeCases": [
+        "Client is in a transient state"
+      ],
+      "suggestion": {
+        "description": "Refine the condition to handle all non-active statuses",
+        "code": "if (!['end', 'reconnecting', 'wait'].includes(this.client.status)) {\n  await this.client.quit();\n}"
+      },
+      "rationale": "Ensuring that the client is not in a transient state before calling quit can prevent errors or unexpected behavior.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "f18ba397-2597-4a1d-8cef-9636878cf899",
+    "timestamp": 1762642296625,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Connection management might be inefficient",
+      "description": "The connect method checks for existing connection statuses but might be called redundantly, leading to unnecessary checks.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20,
+        "endLine": 24
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Implement a connection pooling mechanism or ensure that connect is only called when necessary to avoid redundant status checks.",
+        "code": "if (!['ready', 'connecting', 'connect'].includes(this.client.status)) { await this.client.connect(); }"
+      },
+      "alternative": "Use connection pooling or smarter connection handling",
+      "rationale": "Frequent status checks and connections might slightly degrade performance, especially under high load.",
+      "confidence": 0.7,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "cd29adf5-dc4a-4f24-ab80-6a2a80c49fa1",
+    "timestamp": 1762642467926,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-controlled data",
+      "description": "The method 'get' in RedisCache class deserializes data from Redis without validating the content, which could lead to attacks such as code execution if the data is tampered.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement input validation or sanitization checks before deserializing data.",
+        "code": "if (isValidJSON(value)) { return JSON.parse(value) as T; } else { throw new Error('Invalid data'); }"
+      },
+      "rationale": "Deserializing untrusted data without validation can lead to security vulnerabilities such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "e6c10072-4361-4a5b-9471-b8cfe946df82",
+    "timestamp": 1762642467926,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "JSON.parse can throw an error",
+      "description": "JSON.parse is used without a try-catch block, which can throw an error if the value is not valid JSON.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "When the value returned from Redis is not valid JSON",
+      "edgeCases": [
+        "Invalid JSON string",
+        "Corrupted data"
+      ],
+      "suggestion": {
+        "description": "Wrap JSON.parse in a try-catch block to handle potential exceptions",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (error) {\n  console.error('Failed to parse JSON:', error);\n  return undefined;\n}"
+      },
+      "rationale": "Using JSON.parse without error handling can lead to uncaught exceptions that may crash the application or lead to unhandled promise rejections.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a901ea2e-fc33-4774-ac34-008bfa6f4ea6",
+    "timestamp": 1762642467926,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No error handling in connect, disconnect, set, and delete methods",
+      "description": "The connect, disconnect, set, and delete methods do not handle errors that may occur during Redis operations.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "problematicPath": "Any Redis operation failure",
+      "edgeCases": [
+        "Redis server down",
+        "Network issues",
+        "Invalid commands"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around Redis operations and handle errors appropriately",
+        "code": "try {\n  await this.client.connect();\n} catch (error) {\n  console.error('Failed to connect to Redis:', error);\n  throw error;\n}"
+      },
+      "rationale": "Not handling errors in Redis operations can lead to unhandled promise rejections and may affect the stability of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "9ca4585b-68e9-4504-8a70-6800b6195887",
+    "timestamp": 1762642467926,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "low",
+      "title": "Lack of reconnection strategy on Redis connection failure",
+      "description": "The Redis client setup in the constructor only retries connection twice, which might not be sufficient for transient network issues, potentially leading to application failures.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 14
+      },
+      "cwe": "CWE-1048",
+      "suggestion": {
+        "description": "Implement a more robust connection retry strategy, possibly with exponential backoff.",
+        "code": "this.client = new Redis(options.url, { lazyConnect: true, maxRetriesPerRequest: null, retryStrategy: (times) => Math.min(times * 50, 2000), ...options.redisOptions });"
+      },
+      "rationale": "Improving the resilience of the application by handling transient failures effectively.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a85047b6-0e7f-4097-b0de-6066e3c91d02",
+    "timestamp": 1762642467926,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Inconsistent handling of Redis client status",
+      "description": "The connect method checks for 'ready' or 'connecting' status but disconnect does not consider 'connecting' status.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "problematicPath": "Calling disconnect while the client is still connecting",
+      "edgeCases": [
+        "Disconnect called immediately after connect"
+      ],
+      "suggestion": {
+        "description": "Consider handling 'connecting' status in the disconnect method",
+        "code": "if (this.client.status !== 'end' && this.client.status !== 'connecting') {\n  await this.client.quit();\n}"
+      },
+      "rationale": "Inconsistent status checks can lead to unexpected behavior, such as attempting to disconnect a client that is still in the process of connecting.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "8c03f9c2-9d78-409f-82a5-d3327d582ff2",
+    "timestamp": 1762642534221,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-controlled data",
+      "description": "The method 'get' in RedisCache class deserializes data from Redis without validating the content, which could lead to attacks such as code execution if the data is tampered.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement input validation or sanitization before deserializing data, or use secure serialization libraries.",
+        "code": "return JSON.parse(sanitize(value)) as T;"
+      },
+      "rationale": "Deserializing untrusted data without validation can lead to security vulnerabilities such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "8153b14c-16b7-4a68-9965-ccb43b8d7a92",
+    "timestamp": 1762642534221,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficient JSON serialization/deserialization",
+      "description": "JSON.parse and JSON.stringify are used in get and set methods which can be inefficient for large objects or high-frequency operations.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 29,
+        "endLine": 39
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Consider using more efficient serialization techniques if performance issues arise, or ensure objects are not overly large.",
+        "code": "Consider using libraries like 'bson' or 'protobuf' for more efficient serialization."
+      },
+      "alternative": "Use binary serialization formats like BSON or Protocol Buffers",
+      "rationale": "JSON.parse and JSON.stringify can be slow and memory-intensive for large objects, impacting performance.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0a90b9d6-799b-4c61-bed3-bc200d34b591",
+    "timestamp": 1762642534221,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "JSON.parse can throw an error",
+      "description": "The method JSON.parse is used without a try-catch block, which can throw an error if the value is not valid JSON.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "If the value retrieved from Redis is not valid JSON, JSON.parse will throw an error.",
+      "edgeCases": [
+        "Invalid JSON string",
+        "Corrupted data"
+      ],
+      "suggestion": {
+        "description": "Wrap JSON.parse in a try-catch block to handle potential errors gracefully.",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (error) {\n  console.error('Failed to parse JSON:', error);\n  return undefined;\n}"
+      },
+      "rationale": "Using JSON.parse without error handling can lead to uncaught exceptions that may crash the application or disrupt its flow.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "306e1fba-58d3-4186-b781-b73ac6c46e91",
+    "timestamp": 1762642534221,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No error handling in connect, disconnect, set, and delete methods",
+      "description": "The methods connect, disconnect, set, and delete do not have error handling, which can lead to unhandled promise rejections if Redis operations fail.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "problematicPath": "Any failure in Redis operations such as connect, quit, set, or del.",
+      "edgeCases": [
+        "Redis server down",
+        "Network issues",
+        "Invalid commands"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around Redis operations to handle errors and possibly retry or log them.",
+        "code": "try {\n  await this.client.connect();\n} catch (error) {\n  console.error('Failed to connect to Redis:', error);\n  // Handle or rethrow the error\n}"
+      },
+      "rationale": "Handling errors in asynchronous operations is crucial to prevent unhandled promise rejections and ensure the stability of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ea70921e-98a0-47d3-8044-6804bef3387d",
+    "timestamp": 1762642534221,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Redundant connection status checks",
+      "description": "The connect and disconnect methods check the connection status before proceeding, which might be redundant as ioredis handles connection pooling and reconnections internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 18,
+        "endLine": 26
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove the connection status checks and rely on ioredis's internal handling unless specific issues are encountered.",
+        "code": "await this.client.connect();\nawait this.client.quit();"
+      },
+      "alternative": "Rely on ioredis's internal connection management",
+      "rationale": "ioredis is designed to handle connection issues internally, making explicit checks potentially unnecessary.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "770f01bf-4131-4295-ae91-23922f13d341",
+    "timestamp": 1762642534221,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Inconsistent Redis client status checks",
+      "description": "The connect method checks for 'ready' or 'connecting' status, but the disconnect method checks for 'end'. This might lead to issues if other statuses are involved.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "problematicPath": "Statuses like 'reconnecting' or 'wait' are not considered.",
+      "edgeCases": [
+        "Redis reconnecting",
+        "Initial connection delay"
+      ],
+      "suggestion": {
+        "description": "Review and possibly expand the status checks to handle more states appropriately.",
+        "code": "if (['ready', 'connecting', 'reconnecting'].includes(this.client.status)) {\n  return;\n}"
+      },
+      "rationale": "Ensuring that all relevant Redis client statuses are handled correctly can prevent unwanted behavior such as unnecessary reconnections or failed disconnections.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "4229d5fd-db65-4a74-81f4-d3a25080ac99",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-supplied data",
+      "description": "The method 'get' in RedisCache class deserializes data without validating its integrity or structure, which could lead to attacks such as code execution or data corruption if the input data is tampered.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement integrity checks and structure validation before deserializing data.",
+        "code": "if (isValid(value)) { return JSON.parse(value) as T; } else { throw new Error('Invalid data'); }"
+      },
+      "rationale": "Deserializing untrusted data without validation can lead to security vulnerabilities such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "942e9d18-7b4f-4478-b51b-680bd873ef5f",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficient JSON operations",
+      "description": "JSON.parse and JSON.stringify are used in get and set methods which can be computationally expensive for large objects.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 32,
+        "endLine": 39
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Consider using more efficient serialization methods if performance issues arise with large data objects.",
+        "code": "Use libraries like BSON or implement a custom serialization method that is more performance-optimized for your specific data structures."
+      },
+      "alternative": "Use alternative serialization methods like BSON",
+      "rationale": "JSON operations can become a bottleneck with large and complex data structures.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "7ab8cabb-e823-4601-8b0c-f6f88824469b",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential JSON.parse failure not handled",
+      "description": "The method JSON.parse is used without handling possible exceptions that can be thrown if the input is not valid JSON.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "If the value retrieved from Redis is not valid JSON, JSON.parse will throw an error.",
+      "edgeCases": [
+        "Corrupted JSON data",
+        "Non-JSON data stored under a key"
+      ],
+      "suggestion": {
+        "description": "Wrap JSON.parse in a try-catch block to handle potential exceptions.",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (error) {\n  console.error('Failed to parse JSON:', error);\n  return undefined;\n}"
+      },
+      "rationale": "Handling exceptions from JSON.parse prevents runtime errors and ensures the application remains stable even with corrupted or unexpected data.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "852de6d8-3bcf-40f5-8ce1-59cb5f9d034f",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Redis connection status check may not cover all non-connectable states",
+      "description": "The connect method checks if the Redis client's status is 'ready' or 'connecting' to decide if it should connect. However, other statuses like 'reconnecting' might also indicate that a connection attempt should not be initiated.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "problematicPath": "If the client's status is 'reconnecting', the method might unnecessarily attempt to connect again.",
+      "edgeCases": [
+        "Client status is 'reconnecting'"
+      ],
+      "suggestion": {
+        "description": "Include additional relevant statuses in the condition to prevent unnecessary connection attempts.",
+        "code": "if (['ready', 'connecting', 'reconnecting'].includes(this.client.status)) {\n  return;\n}\nawait this.client.connect();"
+      },
+      "rationale": "Properly handling all relevant connection statuses ensures that the application does not make redundant or conflicting connection attempts.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b7d9f123-bd25-4474-8f2c-b86b321d54b6",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "low",
+      "title": "Lack of reconnection limit in Redis client",
+      "description": "The Redis client is configured to retry connection only twice if the initial connection fails. This might not be sufficient for systems requiring high reliability and can lead to service disruption.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 14
+      },
+      "cwe": "CWE-1048",
+      "suggestion": {
+        "description": "Consider configuring a higher retry limit or implementing exponential backoff strategy for reconnections.",
+        "code": "maxRetriesPerRequest: 5"
+      },
+      "rationale": "Improving the resilience of the Redis connection handling can prevent service disruptions during transient network issues or Redis server failures.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0d9c302c-4d18-4874-9956-98d3594b43d6",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Redundant connection status checks",
+      "description": "The connect method checks for 'ready' or 'connecting' status which might be redundant as ioredis handles connection pooling and reconnections internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 20
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove the status check unless there is a specific need for it in your application context.",
+        "code": "await this.client.connect();"
+      },
+      "alternative": "Rely on ioredis's internal connection management",
+      "rationale": "ioredis is designed to handle connections efficiently, and manual checks might be unnecessary.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "7a43dd38-f794-4360-9b45-1a17f6f1d24f",
+    "timestamp": 1762643219038,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "disconnect method does not handle potential errors from client.quit()",
+      "description": "The disconnect method calls client.quit() without handling possible rejections or errors from this asynchronous operation.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 26
+      },
+      "problematicPath": "If client.quit() fails, the error is not caught or logged, potentially leading to unhandled promise rejections.",
+      "edgeCases": [
+        "Network issues",
+        "Redis server down"
+      ],
+      "suggestion": {
+        "description": "Add error handling for the client.quit() call in the disconnect method.",
+        "code": "try {\n  await this.client.quit();\n} catch (error) {\n  console.error('Error disconnecting from Redis:', error);\n}"
+      },
+      "rationale": "Proper error handling in disconnect operations ensures that errors are gracefully managed and logged, improving the robustness of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a197bfbc-81df-439b-bc9b-8ea3491365d0",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "JSON.parse can throw an error",
+      "description": "JSON.parse is used without a try-catch block, which can throw an error if the value is not valid JSON.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 34
+      },
+      "problematicPath": "When the value returned from Redis is not valid JSON",
+      "edgeCases": [
+        "Invalid JSON string",
+        "Corrupted data"
+      ],
+      "suggestion": {
+        "description": "Wrap JSON.parse in a try-catch block to handle potential exceptions",
+        "code": "try {\n  return JSON.parse(value) as T;\n} catch (error) {\n  console.error('Failed to parse JSON:', error);\n  return undefined;\n}"
+      },
+      "rationale": "Using JSON.parse without error handling can lead to uncaught exceptions that may crash the application or disrupt its flow.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "f34ea959-a85d-4ad5-9a88-5fa76e392e79",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential insecure deserialization of user-controlled data",
+      "description": "The method 'get' in RedisCache class deserializes data from Redis without validating the content, which could lead to attacks if the data is tampered.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31
+      },
+      "cwe": "CWE-502",
+      "suggestion": {
+        "description": "Implement input validation or integrity checks before deserializing data.",
+        "code": "if (isValid(value)) { return JSON.parse(value) as T; } else { throw new Error('Invalid data'); }"
+      },
+      "rationale": "Deserializing untrusted data without validation can lead to attacks such as remote code execution or denial of service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b0ce7c5b-0019-404a-b98f-2c2fe51f4572",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential inefficient JSON serialization/deserialization",
+      "description": "The methods for getting and setting cache entries involve JSON serialization and deserialization, which can be computationally expensive for large objects.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 31,
+        "endLine": 39
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Consider using more efficient serialization techniques or libraries, especially for large or complex objects.",
+        "code": "const value = msgpack.encode(value); // Using MessagePack or similar library\nawait this.client.set(key, value, 'EX', ttl);"
+      },
+      "alternative": "Use binary serialization formats like MessagePack",
+      "rationale": "JSON.parse and JSON.stringify can be slow for large data structures, impacting performance.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "eb83a17e-30a7-4149-b873-19ee93c41329",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "No error handling in connect, disconnect, set, and delete methods",
+      "description": "The connect, disconnect, set, and delete methods do not handle errors that may occur during Redis operations.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 19
+      },
+      "problematicPath": "Any Redis operation failure",
+      "edgeCases": [
+        "Network issues",
+        "Redis server down",
+        "Permission issues"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around Redis operations and handle errors appropriately",
+        "code": "try {\n  await this.client.connect();\n} catch (error) {\n  console.error('Failed to connect to Redis:', error);\n  throw error;\n}"
+      },
+      "rationale": "Not handling errors in Redis operations can lead to unhandled promise rejections and may affect the stability of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ed8ad5c4-bd63-469c-b8f7-88c26a71ac87",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential misuse of Redis status checks",
+      "description": "The status checks in connect and disconnect methods may not cover all edge cases, such as partially connected states or errors.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 19
+      },
+      "problematicPath": "Redis client in an unexpected state",
+      "edgeCases": [
+        "Redis client in 'reconnecting', 'closing', or error states"
+      ],
+      "suggestion": {
+        "description": "Review and possibly expand the status checks to handle more states or implement a more robust state management",
+        "code": "if (['ready', 'connecting', 'reconnecting'].includes(this.client.status)) {\n  return;\n}\nawait this.client.connect();"
+      },
+      "rationale": "Current status checks might not handle all possible states of the Redis client, potentially leading to issues in connection management.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ffd85005-8d39-421b-b26d-88d364fe6730",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "security",
+      "severity": "low",
+      "title": "Lack of connection status checks before disconnect",
+      "description": "The 'disconnect' method in RedisCache class does not check if the connection is already disconnected before attempting to quit, which could lead to unnecessary errors or exceptions.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 25
+      },
+      "cwe": "CWE-754",
+      "suggestion": {
+        "description": "Check the connection status to ensure it's not already disconnected before calling quit.",
+        "code": "if (this.client.status !== 'end' && this.client.status !== 'disconnected') { await this.client.quit(); }"
+      },
+      "rationale": "Preventing unnecessary operations helps in maintaining the stability and performance of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "d7daf840-89bf-4691-92ba-eabfe59ed351",
+    "timestamp": 1762643374351,
+    "fileName": "src/core/cache/redis-cache.ts",
+    "fileHash": "a8729b39751a7f74fd88785ff6d110f8",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Redundant connection status checks",
+      "description": "The connect and disconnect methods check the connection status before proceeding, which might be redundant as the Redis client handles connection pooling and status internally.",
+      "location": {
+        "file": "src/core/cache/redis-cache.ts",
+        "line": 19,
+        "endLine": 27
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove the connection status checks and rely on the Redis client's error handling.",
+        "code": "async connect(): Promise<void> {\n  await this.client.connect();\n}\n\nasync disconnect(): Promise<void> {\n  await this.client.quit();\n}"
+      },
+      "alternative": "Directly use client connect and quit methods",
+      "rationale": "The ioredis library is designed to handle connection states efficiently, making manual checks potentially unnecessary.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
   }
 ]

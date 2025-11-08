@@ -52,13 +52,15 @@ export function buildReviewPrompt(context: ReviewContext): string {
     },
     "suggestion": {
       "description": "How to fix",
-      "code": "Fixed code snippet"
+      "code": "Fixed code snippet with 3-5 lines of surrounding context. Use '// ... existing code ...' markers to show context before and after the fix. Example:\\nfunction example() {\\n  // ... existing code ...\\n  const fixed = 'corrected code here';\\n  // ... existing code ...\\n}"
     },
     "rationale": "Why this is an issue",
     "tags": ["tag1", "tag2"]
   }
 ]
 \`\`\`
+
+IMPORTANT: For the "suggestion.code" field, include 3-5 lines of surrounding context from the original code before and after your fix. Use comment markers like "// ... existing code ..." to indicate unchanged context. This helps with accurate semantic matching when applying the fix.
 
 Focus on real issues that could cause bugs, security problems, or performance issues. Avoid nitpicking about style unless it significantly impacts readability.`;
 

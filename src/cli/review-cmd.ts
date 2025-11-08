@@ -20,6 +20,7 @@ import type { ReviewIssue } from "../core/review/issue.js";
 import ReviewSummary from "../ui/review/ReviewSummary.js";
 import { ensureIndexedAndWatching } from "./index-cmd.js";
 import { MossClient } from "../core/indexer/moss-client.js";
+import { MorphApplier } from "../core/review/morph-applier.js";
 
 let inkModule: any | null = null;
 
@@ -33,7 +34,7 @@ async function getInk() {
 }
 
 /**
- * Apply a fix to a file
+ * Apply a fix to a file using Morph Fast Apply
  */
 async function applyFix(
   issue: ReviewIssue,
@@ -46,31 +47,49 @@ async function applyFix(
 
   const suggestion = issue.suggestion;
 
-  const filePath = path.join(repoPath, issue.location.file);
+  if (!suggestion.code) {
+    console.log(chalk.yellow("  No code fix available for this issue"));
+    return false;
+  }
 
   try {
-    const content = await fs.readFile(filePath, "utf-8");
-    const lines = content.split("\n");
-
-    // If we have endLine, replace the range
-    if (
-      issue.location.endLine &&
-      issue.location.endLine > issue.location.line
-    ) {
-      const startLine = issue.location.line - 1; // 0-indexed
-      const endLine = issue.location.endLine - 1;
-      const numLinesToReplace = endLine - startLine + 1;
-
-      lines.splice(startLine, numLinesToReplace, suggestion.code ?? "");
-    } else {
-      // Just replace the single line
-      lines[issue.location.line - 1] = suggestion.code ?? "";
+    // Initialize Morph applier
+    let morphApplier: MorphApplier;
+    try {
+      morphApplier = await MorphApplier.fromBackend();
+    } catch (error) {
+      console.error(
+        chalk.red(
+          "  ✗ Morph credentials not configured. Please ensure your account has Morph access."
+        )
+      );
+      if (error instanceof Error) {
+        console.error(chalk.gray(`    ${error.message}`));
+      }
+      return false;
     }
 
-    const newContent = lines.join("\n");
-    await fs.writeFile(filePath, newContent, "utf-8");
+    // Apply the fix using Morph's Fast Apply
+    // Construct absolute path and pass it directly
+    // Check if path is already absolute to avoid duplication
+    const absoluteFilePath = issue.location.file;
+
+    const result = await morphApplier.applyFixToFile(
+      absoluteFilePath,
+      suggestion.code,
+      suggestion.description || "Apply code fix"
+    );
+
+    if (!result.success) {
+      throw new Error("Failed to apply fix");
+    }
 
     console.log(chalk.green("  ✓ Fix applied successfully"));
+    console.log(
+      chalk.gray(
+        `    +${result.linesAdded} -${result.linesRemoved} ~${result.linesModified} lines`
+      )
+    );
     return true;
   } catch (error) {
     console.error(

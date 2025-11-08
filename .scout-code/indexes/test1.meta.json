@@ -2,7 +2,7 @@
   "repo_full_name": "test1",
   "files": {
     "src/core/cache/redis-cache.ts": {
-      "hash": "e151a89f293dc172caf7dd5cf91c318a",
+      "hash": "5bbb22f41da61bb83c300f4226f8d0df",
       "chunks": [
         "src/core/cache/redis-cache.ts::chunk-0"
       ]
@@ -20,7 +20,7 @@
       ]
     },
     "src/core/mcp/tools.ts": {
-      "hash": "fcabc9c42b2d234958d61650a3948db9",
+      "hash": "f0b911196fd1ac346d60b3aff8f0a9c9",
       "chunks": [
         "src/core/mcp/tools.ts::chunk-0",
         "src/core/mcp/tools.ts::chunk-1",
@@ -231,8 +231,29 @@
       "chunks": [
         "src/cli/index.ts::chunk-0"
       ]
+    },
+    "src/core/review/morph-applier.ts": {
+      "hash": "15377a6ff7a229a523a5ee9d93fdf438",
+      "chunks": [
+        "src/core/review/morph-applier.ts::chunk-0",
+        "src/core/review/morph-applier.ts::chunk-1"
+      ]
+    },
+    "src/cli/review-cmd.ts": {
+      "hash": "1c5746e75cf75d876ddcb9d7be344a3c",
+      "chunks": [
+        "src/cli/review-cmd.ts::chunk-0",
+        "src/cli/review-cmd.ts::chunk-1",
+        "src/cli/review-cmd.ts::chunk-2",
+        "src/cli/review-cmd.ts::chunk-3",
+        "src/cli/review-cmd.ts::chunk-4",
+        "src/cli/review-cmd.ts::chunk-5",
+        "src/cli/review-cmd.ts::chunk-6",
+        "src/cli/review-cmd.ts::chunk-7",
+        "src/cli/review-cmd.ts::chunk-8"
+      ]
     }
   },
   "created_at": "2025-11-04T08:02:50.514Z",
-  "updated_at": "2025-11-04T08:02:50.514Z"
+  "updated_at": "2025-11-08T23:11:21.403Z"
 }

@@ -265,6 +265,7 @@ export function createReviewCommand(): Command {
     .option("--similar", "Show similar past issues from memory")
     .option("--fix", "Interactively apply suggested fixes")
     .action(async (files: string[], options) => {
+      const reviewStartTime = Date.now();
       const spinner = ora("Initializing review...").start();
 
       try {
@@ -428,8 +429,12 @@ export function createReviewCommand(): Command {
           }
         );
 
+        const reviewEndTime = Date.now();
+        const reviewDuration = reviewEndTime - reviewStartTime;
+        const durationSeconds = (reviewDuration / 1000).toFixed(2);
+
         spinner.succeed(
-          `Review complete - found ${results.issues.length} issue(s)`
+          `Review complete - found ${results.issues.length} issue(s) in ${durationSeconds}s`
         );
 
         // 6. Show similar issues if requested

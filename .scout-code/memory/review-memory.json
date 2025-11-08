@@ -1471,5 +1471,760 @@
       "tags": []
     },
     "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "bd31b9a8-7895-48a8-9649-a31cb7b226be",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Command Injection vulnerability",
+      "description": "User-controlled input is used in spawning a child process, which can lead to command injection.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 63
+      },
+      "cwe": "CWE-78",
+      "suggestion": {
+        "description": "Sanitize and validate all user inputs used in command execution or use safer APIs.",
+        "code": "const python = process.env.SCOUT_PYTHON ? process.env.SCOUT_PYTHON.replace(/[^a-zA-Z0-9_]/g, '') : 'python3';"
+      },
+      "rationale": "Using environment variables or other user-controlled inputs directly in command execution can allow an attacker to execute arbitrary commands.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "871d86c0-32a9-43d2-a3b0-d16f8b2cfe7e",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Incorrect conditional logic for cloudAuth.missingIndexerEnvVar and cloudAuth.missingRedisEnvVar checks",
+      "description": "The condition checks for missing environment variables are incorrectly tied to the absence of 'config.cloud?.api_key', which is not logically related to the presence of these environment variables.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 28
+      },
+      "problematicPath": "When 'config.cloud?.api_key' is set, the warnings for missing environment variables are not logged, even if they are actually missing.",
+      "edgeCases": [
+        "config.cloud.api_key is set but environment variables are missing"
+      ],
+      "suggestion": {
+        "description": "Separate the checks for missing environment variables from the check for 'config.cloud?.api_key'.",
+        "code": "if (cloudAuth.missingIndexerEnvVar) {\n  logger.warn(`Cloud hosting enabled but environment variable ${cloudAuth.missingIndexerEnvVar} is not set. Requests may fail.`);\n}\nif (cloudAuth.missingRedisEnvVar) {\n  logger.warn(`Hosted Redis configured but missing secret environment variable(s): ${cloudAuth.missingRedisEnvVar}.`);\n}"
+      },
+      "rationale": "The presence of an API key does not guarantee that necessary environment variables are set, which could lead to runtime failures.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c919d365-2bd0-48b1-95f8-393947c2147a",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated loading of configuration",
+      "description": "The configuration is loaded multiple times across different methods which can be inefficient, especially if the configuration loading is a heavy operation.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 10
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load the configuration once and reuse it across methods by passing it as a parameter or storing it in a class property.",
+        "code": "this.config = await loadConfig();"
+      },
+      "alternative": "Store configuration in a class property after first load",
+      "rationale": "Avoids multiple I/O operations and parsing, improving performance and reducing resource usage.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "33172b41-6809-40e6-b290-1ea940fb73c5",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Unnecessary repeated API key loading",
+      "description": "The API key is loaded repeatedly in different methods which can be optimized by loading it once and reusing it.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 47
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Load the API key once and reuse it by storing it in a class property.",
+        "code": "this.apiKey = await loadApiKey(repoRoot);"
+      },
+      "alternative": "Store API key in a class property after first load",
+      "rationale": "Reduces the number of disk reads and potential parsing, enhancing performance.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "05382cdc-015c-46b7-baba-f2cf744b3f6f",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential unhandled promise rejection in daemon command action",
+      "description": "The async actions within the 'daemon' command do not have error handling, which could lead to unhandled promise rejections if an error occurs during the 'start', 'stop', or 'status' operations.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "problematicPath": "Errors thrown in the 'start', 'stop', or 'status' methods are not caught.",
+      "edgeCases": [
+        "Network issues during 'start', 'stop', or 'status'",
+        "Configuration load failure"
+      ],
+      "suggestion": {
+        "description": "Add try-catch blocks around the async operations to handle potential errors.",
+        "code": "try {\n  await manager.start();\n} catch (error) {\n  logger.error(`Failed to start daemon: ${error.message}`);\n}\n// Repeat for 'stop' and 'status'"
+      },
+      "rationale": "Handling errors in asynchronous operations prevents unhandled promise rejections and improves the robustness of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "30445ac4-0174-4434-a621-42a625dbc64e",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Potential unhandled promise rejection",
+      "description": "The 'waitForHealth' method uses a promise inside a loop without handling potential rejections properly, which could lead to unhandled promise rejections.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 156
+      },
+      "complexity": "O(n)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Add error handling inside the loop to catch and handle promise rejections.",
+        "code": "await new Promise((resolve, reject) => setTimeout(resolve, 500)).catch(error => logger.error('Error during wait:', error));"
+      },
+      "alternative": "Proper error handling for promises within loops",
+      "rationale": "Improves reliability and error handling in asynchronous operations.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "39450224-f081-41f7-909d-11ecc57d7904",
+    "timestamp": 1762572775662,
+    "fileName": "src/cli/daemon.ts",
+    "fileHash": "ef50823f9821618822b832c1e0e75f7c",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Inconsistent use of environment variables for Python executable",
+      "description": "The Python executable is determined by 'SCOUT_PYTHON' environment variable with a fallback to 'python3', but there is no similar pattern observed in other parts of the application which might use Python.",
+      "location": {
+        "file": "src/cli/daemon.ts",
+        "line": 60
+      },
+      "problematicPath": "Only in this file, the Python executable is configurable via an environment variable.",
+      "edgeCases": [
+        "Other parts of the application needing a Python executable"
+      ],
+      "suggestion": {
+        "description": "Standardize the approach for determining the Python executable across the application or document the reason for this specific usage.",
+        "code": "// No specific code change, recommendation for broader codebase consistency"
+      },
+      "rationale": "Consistency in how external dependencies like Python are configured helps in maintaining and understanding the codebase.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "bcdfa576-a6c0-458f-9809-bc7159d66718",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "security",
+      "severity": "high",
+      "title": "Hardcoded sensitive information",
+      "description": "The default proxy URL is hardcoded and points to localhost, which could inadvertently expose the service if used in a production environment without proper configuration.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 11
+      },
+      "cwe": "CWE-798",
+      "suggestion": {
+        "description": "Remove hardcoded sensitive defaults and ensure they are securely configured through environment variables or secure configuration files.",
+        "code": "const CLOUD_PROXY_URL = process.env.SCOUT_PROXY_URL;"
+      },
+      "rationale": "Hardcoding sensitive information like URLs or credentials can lead to accidental exposure and misuse in different environments.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "a2121eaa-c20b-4ae0-97aa-4e4e29203520",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Potential infinite loop in generateStream method",
+      "description": "The generateStream method could potentially enter an infinite loop if the reader continuously reads data that does not contain a newline character.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 253
+      },
+      "problematicPath": "While loop continues indefinitely if no newline character is present in the data chunks read from the reader.",
+      "edgeCases": [
+        "Continuous data stream without newline characters"
+      ],
+      "suggestion": {
+        "description": "Add a mechanism to break out of the loop after a certain condition or timeout to prevent potential infinite loops.",
+        "code": "if (someCondition) { break; }"
+      },
+      "rationale": "Preventing infinite loops is crucial to avoid hanging the application, especially in a streaming context where data format might vary.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c3fae4fa-9523-4a86-b26a-051fc4b66aaa",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential Server-Side Request Forgery (SSRF)",
+      "description": "The proxy URL is taken from user input or environment variables without validation, which could be exploited to perform SSRF attacks by sending requests to unintended internal or external services.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 28
+      },
+      "cwe": "CWE-918",
+      "suggestion": {
+        "description": "Validate and sanitize the proxy URL to ensure it points to a safe and intended destination.",
+        "code": "if (!isValidUrl(this.proxyUrl)) { throw new Error('Invalid proxy URL'); }"
+      },
+      "rationale": "Accepting URLs without validation can allow attackers to manipulate the server into making requests to arbitrary URLs, leading to SSRF vulnerabilities.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "f7aa4b36-cad6-4f55-8f6e-58d806701777",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Insecure default timeout setting",
+      "description": "The default timeout for requests is set to 60 seconds, which might be too high and could be used to perform denial of service (DoS) attacks by sending requests that take a long time to complete.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 29
+      },
+      "cwe": "CWE-400",
+      "suggestion": {
+        "description": "Consider lowering the default timeout to a more reasonable value to mitigate potential DoS attacks.",
+        "code": "this.timeout = config?.timeout || 10000; // 10 second default"
+      },
+      "rationale": "A high timeout setting can be exploited by attackers to hold resources longer than necessary, potentially leading to service unavailability.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "3a9116ae-775a-418d-9d0a-567ace59b881",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Lack of error handling for JSON parsing",
+      "description": "The JSON parsing logic in the streaming response handler does not adequately handle parsing errors, which could lead to unhandled exceptions and service interruptions.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 242
+      },
+      "cwe": "CWE-730",
+      "suggestion": {
+        "description": "Implement robust error handling around JSON parsing to gracefully handle malformed JSON data.",
+        "code": "try { const data = JSON.parse(jsonStr); } catch (error) { logger.error('Failed to parse JSON', error); continue; }"
+      },
+      "rationale": "Improper error handling can lead to crashes or unexpected behavior when encountering malformed or unexpected input.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "ad67c93a-fe49-4090-b1a6-46fe760923c3",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Repeated token validation and refresh",
+      "description": "The ensureAuthenticated method is called for each request, which may repeatedly check and refresh tokens even if they are still valid.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 47
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Cache the result of token validation and refresh it only when necessary or at regular intervals.",
+        "code": "if (!this.tokenValid) {\n  this.ensureAuthenticated();\n}"
+      },
+      "alternative": "Implement token caching with expiration checks",
+      "rationale": "Avoiding unnecessary token operations can reduce latency and load on the authentication service.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b20ec658-1325-40c8-84f1-03c3b49ba730",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Inefficient error handling in makeRequest",
+      "description": "The makeRequest method parses error messages for every non-200 response, which can be optimized by handling common cases more efficiently.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 85
+      },
+      "complexity": "O(n)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Use specific status codes for common errors and handle them without parsing the response text.",
+        "code": "if (response.status === 404) {\n  throw new Error('Resource not found');\n}"
+      },
+      "alternative": "Optimize common error handling",
+      "rationale": "Reducing the need to parse error messages for every failed request can improve performance, especially under high load.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "4a1fae9e-7e97-4bfa-ad86-2aeb33ee28d1",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Unhandled promise rejection in ensureAuthenticated method",
+      "description": "The ensureAuthenticated method does not handle the case where the refreshAccessToken function might reject the promise, leading to an unhandled promise rejection.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 61
+      },
+      "problematicPath": "Promise rejection from refreshAccessToken is not caught.",
+      "edgeCases": [
+        "Network issues during token refresh",
+        "Server errors during token refresh"
+      ],
+      "suggestion": {
+        "description": "Add a catch block to handle possible rejections from the refreshAccessToken call.",
+        "code": "const refreshResult = await refreshAccessToken(this.tokens.refreshToken).catch(err => { throw new Error('Failed to refresh access token: ' + err.message); });"
+      },
+      "rationale": "Handling all possible promise rejections is essential to prevent runtime errors and improve the robustness of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "cb1a0435-4cf1-4aeb-80ad-3b48dd016c6a",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Incorrect error handling logic in makeRequest method",
+      "description": "The makeRequest method throws a generic error message for all exceptions, which might obscure the underlying error details useful for debugging.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 134
+      },
+      "problematicPath": "Catching and re-throwing errors with a generic message.",
+      "edgeCases": [
+        "Network failures",
+        "Invalid responses"
+      ],
+      "suggestion": {
+        "description": "Preserve original error information when re-throwing exceptions.",
+        "code": "throw new Error('Error during cloud proxy request: ' + error.message);"
+      },
+      "rationale": "Maintaining the original error message and details is crucial for effective debugging and error tracking.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "76353aaf-9a90-4214-91b7-b48c995415e5",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary string operations in generateStream",
+      "description": "The generateStream method performs unnecessary string concatenation and splitting for each chunk of data received.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 244
+      },
+      "complexity": "O(n)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Buffer the incoming data more efficiently to reduce the overhead of string operations.",
+        "code": "const buffer = [];\nbuffer.push(value);\nconst lines = buffer.join('').split('\\n');"
+      },
+      "alternative": "Use more efficient data buffering techniques",
+      "rationale": "Optimizing data buffering can reduce CPU usage and improve response times for streaming data.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "2d213691-292e-4ca8-920d-6e313352e586",
+    "timestamp": 1762573170653,
+    "fileName": "src/core/llm/providers/cloud-proxy.ts",
+    "fileHash": "8a03deea440f1e7adea3d2812ad963c5",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Unused import in cloud-proxy.ts",
+      "description": "The import 'type LLMStreamChunk' is declared but its associated type is never used in the file.",
+      "location": {
+        "file": "src/core/llm/providers/cloud-proxy.ts",
+        "line": 5
+      },
+      "problematicPath": "Import statement for LLMStreamChunk.",
+      "edgeCases": [
+        "Code cleanup and optimization"
+      ],
+      "suggestion": {
+        "description": "Remove the unused import to clean up the code.",
+        "code": "// Removed unused import"
+      },
+      "rationale": "Removing unused code and imports helps in maintaining clean and readable codebase.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "506c8db2-d902-4312-9e21-6b2fd1537cb2",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "bug",
+      "severity": "high",
+      "title": "Unhandled promise rejection in fetchAndParse",
+      "description": "The fetchAndParse function does not handle exceptions thrown by the fetch call, leading to unhandled promise rejections if the network request fails.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 104
+      },
+      "problematicPath": "If fetch throws an error due to network issues, it is not caught.",
+      "edgeCases": [
+        "Network request failures",
+        "Invalid URLs"
+      ],
+      "suggestion": {
+        "description": "Add a try-catch block around the fetch call to handle exceptions and prevent unhandled promise rejections.",
+        "code": "try { const response = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'ScoutCode DocumentCrawler/1.0' } }); } catch (error) { console.error('Fetch failed:', error); throw error; }"
+      },
+      "rationale": "Handling errors from network requests is crucial to prevent crashes and ensure the stability of the application.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b30e84fe-cfbc-4b94-873f-72874f32fb0d",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Potential Server-Side Request Forgery (SSRF) vulnerability",
+      "description": "The application fetches URLs based on user input without sufficient validation, which could allow an attacker to make internal network requests.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 74
+      },
+      "cwe": "CWE-918",
+      "suggestion": {
+        "description": "Implement strict validation of URLs before fetching them, including schema validation and domain whitelisting.",
+        "code": "if (isValidUrl(url) && isAllowedDomain(url)) { const response = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'ScoutCode DocumentCrawler/1.0' } }); }"
+      },
+      "rationale": "Fetching URLs based on user input without proper validation can expose the application to SSRF attacks, where an attacker could access or interact with internal services.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "975a2ca9-de59-4bd8-83b4-c48464d2c7a4",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "security",
+      "severity": "medium",
+      "title": "Lack of resource limits for fetched URLs",
+      "description": "The application does not limit the size of the response body when fetching URLs, which could lead to resource exhaustion.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 74
+      },
+      "cwe": "CWE-770",
+      "suggestion": {
+        "description": "Implement limits on the size of the response body to prevent resource exhaustion.",
+        "code": "const response = await fetch(url, { size: 10485760, signal: controller.signal, headers: { 'User-Agent': 'ScoutCode DocumentCrawler/1.0' } }); // Limit response size to 10MB"
+      },
+      "rationale": "Without limits on the size of the response, an attacker could cause the server to allocate excessive resources by responding with very large payloads.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "0fac0896-4716-4a40-be52-ac472f235120",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Inefficient link extraction and checking",
+      "description": "The method `extractLinks` checks for duplicate URLs by using an array and the `includes` method, which can be inefficient for large numbers of links due to O(n) complexity for each check.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 242
+      },
+      "complexity": "O(n²)",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Use a Set to store and check for unique URLs, which allows O(1) complexity for insertion and lookup.",
+        "code": "const links = new Set<string>();\n...if (!links.has(cleanUrl)) {\n  links.add(cleanUrl);\n}"
+      },
+      "alternative": "Convert the links array to a Set",
+      "rationale": "Using a Set reduces the time complexity from O(n²) to O(n) for the link extraction process.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c5ac5da1-d299-4c18-80da-35895d958bfa",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "performance",
+      "severity": "medium",
+      "title": "Potential memory leak with timeout",
+      "description": "The `fetchAndParse` method sets a timeout for fetch operations but does not always clear it, especially if the fetch promise is rejected before the timeout is reached.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 156
+      },
+      "complexity": "N/A",
+      "impact": "medium",
+      "suggestion": {
+        "description": "Ensure that the timeout is cleared in all cases by adding clearTimeout in a catch block or finally block.",
+        "code": "try { ... } catch (error) { clearTimeout(timeoutId); throw error; } finally { clearTimeout(timeoutId); }"
+      },
+      "alternative": "Use finally block to ensure cleanup",
+      "rationale": "Properly managing resources like timeouts prevents potential memory leaks and ensures that resources are freed up correctly.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c6a9db6f-e784-435d-8caf-71317063710c",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Potential infinite loop with circular links",
+      "description": "The crawler does not handle the case where pages link to each other in a circular manner, potentially causing an infinite loop or excessive memory usage.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 58
+      },
+      "problematicPath": "Circular links between pages are not detected, leading to repeated crawling of the same pages.",
+      "edgeCases": [
+        "Pages that link to each other directly or indirectly in a loop"
+      ],
+      "suggestion": {
+        "description": "Implement a mechanism to detect and prevent adding already visited URLs to the queue, even if they come from different paths.",
+        "code": "if (!this.visited.has(link)) { this.queue.push({ url: link, depth: depth + 1 }); }"
+      },
+      "rationale": "Without handling circular links, the crawler can run indefinitely or consume excessive resources.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "85fe7fdc-deed-42d5-81c8-98fbed378480",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "bug",
+      "severity": "medium",
+      "title": "Incorrect handling of default options in constructor",
+      "description": "The constructor incorrectly overrides the default options when any options are provided, potentially leading to unexpected behavior if not all options are specified by the caller.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 23
+      },
+      "problematicPath": "Providing a single option like { followLinks: true } will unset other defaults like maxDepth and maxPages.",
+      "edgeCases": [
+        "Partial options provided"
+      ],
+      "suggestion": {
+        "description": "Modify the constructor to merge provided options with defaults properly, ensuring that unspecified options retain their default values.",
+        "code": "this.options = { maxDepth: 1, maxPages: 10, followLinks: false, timeout: 30000, ...options };"
+      },
+      "rationale": "Proper handling of default options ensures that the system behaves predictably when not all options are explicitly set.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "c0e7db1f-224d-4271-901d-2a4f58b377b9",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "security",
+      "severity": "low",
+      "title": "Exposure of sensitive information through error messages",
+      "description": "Detailed error messages are logged, which could expose sensitive information about the application's internal workings to an attacker.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 89
+      },
+      "cwe": "CWE-209",
+      "suggestion": {
+        "description": "Modify error handling to log generic messages for the client, while detailed logs should be written to a secure server-side log file.",
+        "code": "console.warn('Failed to crawl URL.');"
+      },
+      "rationale": "Detailed error messages can help an attacker learn about the system and form a basis for further attacks.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "b0881198-53e7-4335-96c4-4d96d4a1c108",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "performance",
+      "severity": "low",
+      "title": "Unnecessary re-check of visited URLs",
+      "description": "The `crawl` method checks if a URL has been visited after dequeuing it, which is redundant since URLs are checked before being enqueued.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 40
+      },
+      "complexity": "O(1)",
+      "impact": "low",
+      "suggestion": {
+        "description": "Remove the redundant visited check after dequeuing URLs.",
+        "code": "const { url, depth } = this.queue.shift()!;\nif (depth > (this.options.maxDepth || 1)) { continue; }"
+      },
+      "alternative": "Optimize conditional checks",
+      "rationale": "Removing unnecessary checks can slightly improve performance and reduce the complexity of the code.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
+  },
+  {
+    "id": "8c746f03-a647-4815-a0c7-936644ac85fb",
+    "timestamp": 1762573242484,
+    "fileName": "src/core/indexer/doc-crawler.ts",
+    "fileHash": "5307797cb6c5e826f6d1b51cc5b39f77",
+    "issue": {
+      "type": "bug",
+      "severity": "low",
+      "title": "Potential for duplicate URLs in the links array",
+      "description": "The extractLinks function does not check for duplicates before adding a new URL to the links array, which could lead to unnecessary processing and network requests.",
+      "location": {
+        "file": "src/core/indexer/doc-crawler.ts",
+        "line": 217
+      },
+      "problematicPath": "Adding links to the array without checking for duplicates.",
+      "edgeCases": [
+        "HTML pages with multiple identical links"
+      ],
+      "suggestion": {
+        "description": "Check for duplicates before adding URLs to the links array.",
+        "code": "if (!links.includes(cleanUrl)) { links.push(cleanUrl); }"
+      },
+      "rationale": "Preventing duplicates in the links array reduces unnecessary network traffic and processing.",
+      "confidence": 0.8,
+      "tags": []
+    },
+    "repoPath": "/Users/jaymalave/Desktop/ScoutLab/cli"
   }
 ]

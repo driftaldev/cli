@@ -11,6 +11,9 @@ import {
   type EnrichedContext,
 } from "../../core/review/context-strategies.js";
 import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
+import { runSecurityAnalysisWithContext } from "../agents/security-agent.js";
+import { runPerformanceAnalysisWithContext } from "../agents/performance-agent.js";
+import { runLogicAnalysisWithContext } from "../agents/logic-agent.js";
 
 /**
  * Step 1: Analyze changes to understand complexity and risk
@@ -197,7 +200,7 @@ export const runAllAgentsInParallelStep = createStep({
       agent: any,
       agentName: string,
       strategyType: "security" | "performance" | "logic",
-      importPath: string
+      analysisFn: (agent: any, context: any) => Promise<ReviewIssue[]>
     ): Promise<ReviewIssue[]> => {
       const issues: ReviewIssue[] = [];
       const ranker = new RelevanceRanker();
@@ -246,21 +249,8 @@ export const runAllAgentsInParallelStep = createStep({
           };
         }
 
-        // Dynamically import and run the agent-specific analysis function
-        const agentModule = await import(importPath);
-        const runAnalysisFn =
-          agentModule[
-            `run${
-              agentName.charAt(0).toUpperCase() + agentName.slice(1)
-            }AnalysisWithContext`
-          ];
-        if (!runAnalysisFn) {
-          logger.error(
-            `[${agentName}] Failed to find analysis function in ${importPath}`
-          );
-          continue;
-        }
-        const fileIssues = await runAnalysisFn(agent, context);
+        // Run the agent-specific analysis function
+        const fileIssues = await analysisFn(agent, context);
 
         issues.push(...fileIssues);
       }
@@ -280,15 +270,20 @@ export const runAllAgentsInParallelStep = createStep({
         securityAgent,
         "Security",
         "security",
-        "../agents/security-agent.js"
+        runSecurityAnalysisWithContext
       ),
       runAgentOnFiles(
         performanceAgent,
         "Performance",
         "performance",
-        "../agents/performance-agent.js"
+        runPerformanceAnalysisWithContext
       ),
-      runAgentOnFiles(logicAgent, "Logic", "logic", "../agents/logic-agent.js"),
+      runAgentOnFiles(
+        logicAgent,
+        "Logic",
+        "logic",
+        runLogicAnalysisWithContext
+      ),
     ]);
 
     const duration = Date.now() - startTime;

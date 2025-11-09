@@ -6,6 +6,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { logger } from '../../utils/logger';
+import { execSync } from 'child_process';
 
 export interface DependencyNode {
   filePath: string;
@@ -34,7 +35,7 @@ export class DependencyGraphBuilder {
   private repoPath: string;
   private fileCache: Map<string, string> = new Map();
 
-  constructor(repoPath: string) {
+  constructor(repoPath: string, repoName?: string) {
     this.repoPath = repoPath;
   }
 
@@ -302,8 +303,12 @@ export class DependencyGraphBuilder {
     const resolved: Array<{ importPath: string; resolvedPath: string }> = [];
 
     for (const imp of imports) {
-      if (!includeNodeModules && !imp.startsWith('.') && !imp.startsWith('/')) {
-        continue; // Skip node_modules imports
+      // Skip external modules if not including node_modules
+      if (!includeNodeModules) {
+        // Skip if it doesn't look like a local import
+        if (!imp.startsWith('@') && !imp.startsWith('.') && !imp.startsWith('/')) {
+          continue;
+        }
       }
 
       const resolvedPath = await this.resolveImportPath(imp, fromFile);
@@ -316,31 +321,67 @@ export class DependencyGraphBuilder {
   }
 
   /**
-   * Resolve a single import path
+   * Resolve a single import path using right-to-left grep approach
    */
   private async resolveImportPath(importPath: string, fromFile: string): Promise<string | null> {
-    // Handle relative imports
-    if (importPath.startsWith('.')) {
-      const baseDir = path.dirname(fromFile);
-      const candidates = [
-        path.join(baseDir, importPath),
-        path.join(baseDir, `${importPath}.ts`),
-        path.join(baseDir, `${importPath}.tsx`),
-        path.join(baseDir, `${importPath}.js`),
-        path.join(baseDir, `${importPath}.jsx`),
-        path.join(baseDir, importPath, 'index.ts'),
-        path.join(baseDir, importPath, 'index.tsx'),
-        path.join(baseDir, importPath, 'index.js'),
-        path.join(baseDir, importPath, 'index.jsx'),
-      ];
+    // Extract base filename from import path
+    const parts = importPath.split('/');
+    const baseFileName = parts[parts.length - 1];
 
-      for (const candidate of candidates) {
-        if (await this.fileExists(candidate)) {
-          return candidate;
+    logger.debug(`[DependencyGraph] Resolving import: "${importPath}"`);
+    logger.debug(`[DependencyGraph] Extracted base filename: "${baseFileName}"`);
+
+    // File extensions to try
+    const extensions = ['.ts', '.tsx', '.js', '.jsx'];
+
+    // Try to find file using find command (right-to-left approach)
+    for (const ext of extensions) {
+      const searchPattern = `${baseFileName}${ext}`;
+      logger.debug(`[DependencyGraph] Trying extension: ${ext}`);
+      logger.debug(`[DependencyGraph] Searching for: "${searchPattern}"`);
+
+      try {
+        const cmd = `find "${this.repoPath}" -name "${searchPattern}" -type f 2>/dev/null | head -1`;
+        logger.debug(`[DependencyGraph] Executing command: ${cmd}`);
+
+        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+        logger.debug(`[DependencyGraph] Command result: ${result ? `"${result}"` : '(empty)'}`);
+
+        if (result) {
+          logger.debug(`[DependencyGraph] ✓ Found "${importPath}" → "${result}"`);
+          return result;
+        } else {
+          logger.debug(`[DependencyGraph] No match for ${ext}, continuing to next extension`);
         }
+      } catch (error) {
+        logger.debug(`[DependencyGraph] Error during find with ${ext}: ${error}`);
       }
     }
 
+    // Also try index files
+    logger.debug(`[DependencyGraph] Trying index files for "${baseFileName}"`);
+    for (const ext of extensions) {
+      logger.debug(`[DependencyGraph] Trying index with extension: ${ext}`);
+
+      try {
+        const cmd = `find "${this.repoPath}" -path "*/${baseFileName}/index${ext}" -type f 2>/dev/null | head -1`;
+        logger.debug(`[DependencyGraph] Executing index command: ${cmd}`);
+
+        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+        logger.debug(`[DependencyGraph] Index command result: ${result ? `"${result}"` : '(empty)'}`);
+
+        if (result) {
+          logger.debug(`[DependencyGraph] ✓ Found index file for "${importPath}" → "${result}"`);
+          return result;
+        } else {
+          logger.debug(`[DependencyGraph] No index match for ${ext}, continuing`);
+        }
+      } catch (error) {
+        logger.debug(`[DependencyGraph] Error during index find with ${ext}: ${error}`);
+      }
+    }
+
+    logger.debug(`[DependencyGraph] ✗ Could not resolve "${importPath}"`);
     return null;
   }
 

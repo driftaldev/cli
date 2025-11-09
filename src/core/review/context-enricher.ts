@@ -9,6 +9,7 @@ import { DependencyGraphBuilder, DependencyNode, TestFile } from './dependency-g
 import { EnrichedContext } from './context-strategies.js';
 import { logger } from '../../utils/logger.js';
 import { MossClient } from '../indexer/moss-client.js';
+import { execSync } from 'child_process';
 
 export interface ContextEnricherOptions {
   repoPath: string;
@@ -254,31 +255,79 @@ export class ContextEnricher {
   }
 
   /**
-   * Resolve import path to actual file path
+   * Resolve import path using right-to-left grep approach
    */
   private async resolveImportPath(importPath: string, fromFile: string): Promise<string | null> {
-    // Skip node_modules
-    if (!importPath.startsWith('.') && !importPath.startsWith('/')) {
+    logger.debug(`[ContextEnricher] resolveImportPath called for: "${importPath}"`);
+
+    // Skip obvious external packages (no @ or . prefix)
+    if (!importPath.startsWith('@') && !importPath.startsWith('.') && !importPath.startsWith('/')) {
+      logger.debug(`[ContextEnricher] "${importPath}" is external package (no @/./ prefix)`);
       return null;
     }
 
-    const baseDir = path.dirname(fromFile);
-    const extensions = ['.ts', '.tsx', '.js', '.jsx', ''];
+    // Extract base filename from import path
+    // e.g., "@/services/wallet.service" → "wallet.service"
+    // e.g., "./utils/helper" → "helper"
+    const parts = importPath.split('/');
+    const baseFileName = parts[parts.length - 1];
 
-    // Try different extensions
+    logger.debug(`[ContextEnricher] Extracted base filename: "${baseFileName}"`);
+
+    // File extensions to try (TypeScript/JavaScript)
+    const extensions = ['.ts', '.tsx', '.js', '.jsx'];
+
+    // Try to find file using grep (right-to-left approach)
     for (const ext of extensions) {
-      const candidates = [
-        path.join(baseDir, `${importPath}${ext}`),
-        path.join(baseDir, importPath, `index${ext}`),
-      ];
+      const searchPattern = `${baseFileName}${ext}`;
+      logger.debug(`[ContextEnricher] Trying extension: ${ext}`);
+      logger.debug(`[ContextEnricher] Searching for: "${searchPattern}"`);
 
-      for (const candidate of candidates) {
-        if (await this.fileExists(candidate)) {
-          return candidate;
+      try {
+        // Use find command to locate file in repo
+        const cmd = `find "${this.options.repoPath}" -name "${searchPattern}" -type f 2>/dev/null | head -1`;
+        logger.debug(`[ContextEnricher] Executing command: ${cmd}`);
+
+        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+        logger.debug(`[ContextEnricher] Command result: ${result ? `"${result}"` : '(empty)'}`);
+
+        if (result) {
+          logger.debug(`[ContextEnricher] ✓ Found "${importPath}" → "${result}"`);
+          return result;
+        } else {
+          logger.debug(`[ContextEnricher] No match for ${ext}, continuing to next extension`);
         }
+      } catch (error) {
+        logger.debug(`[ContextEnricher] Error during find with ${ext}: ${error}`);
       }
     }
 
+    // Also try index files (e.g., @/components/Button → components/Button/index.tsx)
+    logger.debug(`[ContextEnricher] Trying index files for "${baseFileName}"`);
+    for (const ext of extensions) {
+      const searchPattern = `index${ext}`;
+      logger.debug(`[ContextEnricher] Trying index with extension: ${ext}`);
+
+      try {
+        // Search for index files in a directory matching the last part of the import
+        const cmd = `find "${this.options.repoPath}" -path "*/${baseFileName}/index${ext}" -type f 2>/dev/null | head -1`;
+        logger.debug(`[ContextEnricher] Executing index command: ${cmd}`);
+
+        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+        logger.debug(`[ContextEnricher] Index command result: ${result ? `"${result}"` : '(empty)'}`);
+
+        if (result) {
+          logger.debug(`[ContextEnricher] ✓ Found index file for "${importPath}" → "${result}"`);
+          return result;
+        } else {
+          logger.debug(`[ContextEnricher] No index match for ${ext}, continuing`);
+        }
+      } catch (error) {
+        logger.debug(`[ContextEnricher] Error during index find with ${ext}: ${error}`);
+      }
+    }
+
+    logger.debug(`[ContextEnricher] ✗ Could not resolve "${importPath}" - likely external package`);
     return null;
   }
 

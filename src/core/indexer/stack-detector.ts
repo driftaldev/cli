@@ -10,6 +10,7 @@ interface StackMarker {
 
 const STACK_MARKERS: StackMarker[] = [
   { stack: "nodejs", files: ["package.json"] },
+
   {
     stack: "python",
     files: ["requirements.txt", "pyproject.toml", "setup.py", "Pipfile"],

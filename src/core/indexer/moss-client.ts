@@ -156,6 +156,58 @@ export class MossClient {
     await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2), "utf-8");
   }
 
+  /**
+   * Get all indexed file paths for a repository
+   */
+  async getIndexedFiles(repoFullName: string): Promise<string[]> {
+    const indexName = repoFullName.replace(/\//g, "_");
+    const metadata = await this.loadMetadata(indexName);
+    return metadata ? Object.keys(metadata.files) : [];
+  }
+
+  /**
+   * Find an indexed file by base name and try multiple extensions
+   * Returns the full relative path if found, null otherwise
+   */
+  async findIndexedFile(
+    repoFullName: string,
+    basePath: string,
+    extensions: string[]
+  ): Promise<string | null> {
+    const indexName = repoFullName.replace(/\//g, "_");
+    const metadata = await this.loadMetadata(indexName);
+
+    if (!metadata) {
+      return null;
+    }
+
+    const files = Object.keys(metadata.files);
+
+    // Try exact match first
+    if (files.includes(basePath)) {
+      return basePath;
+    }
+
+    // Try with each extension
+    for (const ext of extensions) {
+      const withExt = ext.startsWith('.') ? `${basePath}${ext}` : `${basePath}.${ext}`;
+      if (files.includes(withExt)) {
+        return withExt;
+      }
+    }
+
+    // Try index files (e.g., path/index.ts)
+    for (const ext of extensions) {
+      const extStr = ext.startsWith('.') ? ext : `.${ext}`;
+      const indexPath = `${basePath}/index${extStr}`;
+      if (files.includes(indexPath)) {
+        return indexPath;
+      }
+    }
+
+    return null;
+  }
+
   private hashContent(content: string): string {
     return crypto.createHash("md5").update(content).digest("hex");
   }

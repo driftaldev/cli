@@ -20,7 +20,6 @@ export class MorphApplier {
   static async fromBackend(): Promise<MorphApplier> {
     try {
       const credentials = await fetchMorphCredentials();
-      logger.debug("Morph credentials fetched successfully");
       return new MorphApplier(credentials.api_key);
     } catch (error) {
       logger.error("Failed to fetch Morph credentials", error);

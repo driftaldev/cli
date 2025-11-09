@@ -38,7 +38,8 @@ async function getInk() {
  */
 async function applyFix(
   issue: ReviewIssue,
-  repoPath: string
+  repoPath: string,
+  morphApplier: MorphApplier
 ): Promise<boolean> {
   if (!issue.suggestion || typeof issue.suggestion === "string") {
     console.log(chalk.yellow("  No code fix available for this issue"));
@@ -53,22 +54,6 @@ async function applyFix(
   }
 
   try {
-    // Initialize Morph applier
-    let morphApplier: MorphApplier;
-    try {
-      morphApplier = await MorphApplier.fromBackend();
-    } catch (error) {
-      console.error(
-        chalk.red(
-          "  ✗ Morph credentials not configured. Please ensure your account has Morph access."
-        )
-      );
-      if (error instanceof Error) {
-        console.error(chalk.gray(`    ${error.message}`));
-      }
-      return false;
-    }
-
     // Apply the fix using Morph's Fast Apply
     // Construct absolute path and pass it directly
     // Check if path is already absolute to avoid duplication
@@ -124,6 +109,23 @@ async function interactiveFixReview(
     return;
   }
 
+  // Initialize Morph applier once for the entire review session
+  let morphApplier: MorphApplier;
+  try {
+    morphApplier = await MorphApplier.fromBackend();
+    console.log(chalk.gray("Morph credentials fetched successfully"));
+  } catch (error) {
+    console.error(
+      chalk.red(
+        "\n✗ Morph credentials not configured. Please ensure your account has Morph access."
+      )
+    );
+    if (error instanceof Error) {
+      console.error(chalk.gray(`  ${error.message}`));
+    }
+    return;
+  }
+
   console.log(
     chalk.bold(
       `\n🔧 Found ${fixableIssues.length} issue(s) with suggested fixes\n`
@@ -167,7 +169,7 @@ async function interactiveFixReview(
     }
 
     if (action === "apply") {
-      await applyFix(issue, repoPath);
+      await applyFix(issue, repoPath, morphApplier);
     } else {
       console.log(chalk.gray("  Skipped"));
     }

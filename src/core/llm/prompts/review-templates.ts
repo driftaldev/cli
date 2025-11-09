@@ -16,7 +16,9 @@ export function buildReviewPrompt(context: ReviewContext): string {
   if (context.similarPatterns && context.similarPatterns.length > 0) {
     prompt += `## Similar Patterns in Codebase:\n`;
     context.similarPatterns.forEach((pattern, i) => {
-      prompt += `### Example ${i + 1}:\n\`\`\`${context.language}\n${pattern}\n\`\`\`\n\n`;
+      prompt += `### Example ${i + 1}:\n\`\`\`${
+        context.language
+      }\n${pattern}\n\`\`\`\n\n`;
     });
   }
 
@@ -169,7 +171,9 @@ export function buildSuggestionPrompt(
   if (context.similarPatterns && context.similarPatterns.length > 0) {
     prompt += `Similar code patterns in the repository:\n`;
     context.similarPatterns.forEach((pattern, i) => {
-      prompt += `\n### Example ${i + 1}:\n\`\`\`${context.language}\n${pattern}\n\`\`\`\n`;
+      prompt += `\n### Example ${i + 1}:\n\`\`\`${
+        context.language
+      }\n${pattern}\n\`\`\`\n`;
     });
     prompt += `\n`;
   }

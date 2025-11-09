@@ -8,6 +8,7 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import * as crypto from "crypto";
 import { fetchMossCredentials } from "../../utils/moss-credentials.js";
+import { logger } from "../../utils/logger.js";
 
 export interface IndexFilePayload {
   path: string;
@@ -640,9 +641,12 @@ export class MossClient {
 
     // Also verify the index actually exists in Moss
     try {
+      logger.debug(`Checking if index exists in Moss: ${indexName}`);
       const indexes = await this.moss.listIndexes();
+      logger.debug(`Retrieved ${indexes.length} indexes from Moss`);
       return indexes.some((idx) => idx.name === indexName);
-    } catch {
+    } catch (error) {
+      logger.debug(`Failed to list indexes from Moss: ${error}`);
       return false;
     }
   }

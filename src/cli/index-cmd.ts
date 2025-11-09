@@ -14,6 +14,8 @@ import {
   MossClient
 } from "../core/indexer/moss-client.js";
 import { logger } from "../utils/logger.js";
+import { detectStacks } from "../core/indexer/stack-detector.js";
+import { getIgnorePatternsForStacks } from "../core/indexer/ignore-patterns.js";
 import {
   loadSavedRepoName,
   RepoNameNotConfiguredError,
@@ -69,21 +71,32 @@ async function promptRepoName(repoRoot: string): Promise<string> {
   }
 }
 
-function buildFullIndexRequest(
+async function buildFullIndexRequest(
   repoName: string,
   repoPath: string,
   extensions: string[],
   excludePatterns: string[]
 ): Promise<FullIndexRequest> {
-  return scanFiles({
+  // Detect stacks in the project
+  const stacks = await detectStacks(repoPath);
+  const stackIgnorePatterns = getIgnorePatternsForStacks(stacks);
+
+  logger.info(`Detected stacks: ${stacks.join(", ")}`);
+  logger.info(`Applying ${stackIgnorePatterns.length} stack-specific ignore patterns`);
+
+  const files = await scanFiles({
     root: repoPath,
     extensions,
     excludePatterns,
-    base64Encode: false // Moss uses plain text, not base64
-  }).then((files) => ({
+    base64Encode: false, // Moss uses plain text, not base64
+    stacks,
+    stackIgnorePatterns
+  });
+
+  return {
     repo_full_name: repoName,
     files
-  }));
+  };
 }
 
 async function performIndex(

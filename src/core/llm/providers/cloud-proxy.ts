@@ -5,8 +5,7 @@ import {
   type LLMGenerateResponse,
   type LLMStreamChunk
 } from "../provider.js";
-import { loadAuthTokens, isTokenExpired, AuthTokens } from "../../../utils/token-manager.js";
-import { refreshAccessToken } from "../../../utils/auth.js";
+import { loadAuthTokens, AuthTokens } from "../../../utils/token-manager.js";
 import { logger } from "../../../utils/logger.js";
 
 const CLOUD_PROXY_URL = process.env.SCOUT_PROXY_URL || "http://localhost:3000/v1";
@@ -51,21 +50,6 @@ export class CloudProxyProvider extends LLMProvider {
       throw new Error(
         "Not authenticated. Please run 'scoutcli login' to authenticate."
       );
-    }
-
-    // Check if token is expired and refresh if needed
-    if (isTokenExpired(this.tokens) && this.tokens.refreshToken) {
-      logger.debug("Access token expired, refreshing...");
-
-      const refreshResult = await refreshAccessToken(this.tokens.refreshToken);
-
-      if (!refreshResult.success || !refreshResult.tokens) {
-        throw new Error(
-          "Authentication expired. Please run 'scoutcli login' to re-authenticate."
-        );
-      }
-
-      this.tokens = refreshResult.tokens;
     }
 
     return this.tokens.accessToken;

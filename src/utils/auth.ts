@@ -155,9 +155,8 @@ async function startCallbackServer(state: string): Promise<{
         const tokens: AuthTokens = {
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
-          expiresAt: tokenData.expires_in
-            ? Date.now() + tokenData.expires_in * 1000
-            : undefined,
+          // No expiration - tokens persist until manual logout
+          expiresAt: undefined,
           userEmail: tokenData.user_email,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -309,9 +308,8 @@ export async function refreshAccessToken(
     const tokens: AuthTokens = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token || refreshToken,
-      expiresAt: data.expires_in
-        ? Date.now() + data.expires_in * 1000
-        : undefined,
+      // No expiration - tokens persist until manual logout
+      expiresAt: undefined,
       selectedModels: existingTokens?.selectedModels,
       userEmail: existingTokens?.userEmail,
       createdAt: existingTokens?.createdAt || Date.now(),

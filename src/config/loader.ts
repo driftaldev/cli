@@ -325,8 +325,8 @@ export async function loadLLMConfig(baseConfig?: Partial<LLMConfig>): Promise<LL
   // Check for cloud authentication tokens
   const authTokens = await loadAuthTokens();
 
-  if (authTokens && (!authTokens.expiresAt || (authTokens.expiresAt && Date.now() < authTokens.expiresAt))) {
-    // User is authenticated via cloud proxy - use cloud proxy mode
+  if (authTokens) {
+    // User is authenticated via cloud proxy - use cloud proxy mode (tokens persist until manual logout)
     return {
       providers: {
         primary: "cloud-proxy" as const,

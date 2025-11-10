@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { initiateLogin, refreshAccessToken } from "../utils/auth.js";
+import { initiateLogin } from "../utils/auth.js";
 import { getAuthStatus } from "../utils/token-manager.js";
 import { logger } from "../utils/logger.js";
 import chalk from "chalk";
@@ -13,7 +13,7 @@ async function handleLogin(options: { reauth?: boolean }) {
     if (!options.reauth) {
       const status = await getAuthStatus();
 
-      if (status.authenticated && !status.expired) {
+      if (status.authenticated) {
         console.log(chalk.green("\n✅ Already authenticated!\n"));
         console.log(
           chalk.gray(
@@ -23,30 +23,6 @@ async function handleLogin(options: { reauth?: boolean }) {
           )
         );
         return;
-      }
-
-      // If expired but has refresh token, try to refresh automatically
-      if (
-        status.authenticated &&
-        status.expired &&
-        status.tokens?.refreshToken
-      ) {
-        logger.info("Access token expired. Attempting to refresh...\n");
-
-        const refreshResult = await refreshAccessToken(
-          status.tokens.refreshToken
-        );
-
-        if (refreshResult.success && refreshResult.tokens) {
-          console.log(
-            chalk.green("\n✅ Authentication refreshed successfully!\n")
-          );
-          return;
-        }
-
-        logger.warn("Token refresh failed. Please log in again.\n");
-      } else if (status.authenticated && status.expired) {
-        logger.warn("Your authentication has expired. Please log in again.\n");
       }
     }
 

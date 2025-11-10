@@ -1,6 +1,4 @@
-import { loadAuthTokens, isTokenExpired } from "./token-manager.js";
-import { refreshAccessToken } from "./auth.js";
-import { logger } from "./logger.js";
+import { loadAuthTokens } from "./token-manager.js";
 
 // Default backend URL - can be overridden via env var
 const BACKEND_BASE_URL = process.env.SCOUT_AUTH_URL || "http://localhost:3000";
@@ -15,27 +13,12 @@ export interface MorphCredentials {
  */
 export async function fetchMorphCredentials(): Promise<MorphCredentials> {
   // Load tokens
-  let tokens = await loadAuthTokens();
+  const tokens = await loadAuthTokens();
 
   if (!tokens) {
     throw new Error(
       "Not authenticated. Please run 'scoutcli login' to authenticate."
     );
-  }
-
-  // Refresh token if expired
-  if (isTokenExpired(tokens) && tokens.refreshToken) {
-    logger.debug("Access token expired, refreshing...");
-
-    const refreshResult = await refreshAccessToken(tokens.refreshToken);
-
-    if (!refreshResult.success || !refreshResult.tokens) {
-      throw new Error(
-        "Authentication expired. Please run 'scoutcli login' to re-authenticate."
-      );
-    }
-
-    tokens = refreshResult.tokens;
   }
 
   // Fetch credentials from backend

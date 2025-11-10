@@ -6,6 +6,9 @@ import { loadAuthTokens } from "../utils/token-manager.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
 import { ScoutConfigSchema, type ScoutConfig, type LLMConfig } from "./schema.js";
 
+// Re-export types for convenience
+export type { ScoutConfig, LLMConfig };
+
 type PlainObject = Record<string, unknown>;
 
 function isPlainObject(value: unknown): value is PlainObject {

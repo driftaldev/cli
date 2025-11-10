@@ -7,7 +7,6 @@ import { loadConfig } from "../config/loader.js";
 import { IndexerClient } from "../core/indexer/client.js";
 import { logger } from "../utils/logger.js";
 import { resolveCloudAuth } from "../utils/cloud.js";
-import { loadApiKey } from "../utils/repo-name-store.js";
 
 class DaemonManager {
   private process?: ChildProcess;
@@ -42,13 +41,11 @@ class DaemonManager {
       return;
     }
 
-    const repoRoot = process.cwd();
-    const storedApiKey = await loadApiKey(repoRoot);
     const client = new IndexerClient(
       config.indexer_service.url,
       config.indexer_service.timeout,
       cloudAuth.indexerHeader,
-      storedApiKey
+      undefined
     );
     logger.debug("Indexer client instantiated for daemon start");
 
@@ -122,13 +119,11 @@ class DaemonManager {
     logger.debug("Configuration loaded for daemon status");
     const cloudAuth = resolveCloudAuth(config);
     logger.debug("Cloud authentication resolved for daemon status");
-    const repoRoot = process.cwd();
-    const storedApiKey = await loadApiKey(repoRoot);
     const client = new IndexerClient(
       config.indexer_service.url,
       config.indexer_service.timeout,
       cloudAuth.indexerHeader,
-      storedApiKey
+      undefined
     );
     logger.debug("Indexer client instantiated for daemon status check");
     const healthy = await client.health();

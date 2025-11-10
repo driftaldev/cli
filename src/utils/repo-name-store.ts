@@ -95,22 +95,3 @@ export async function saveRepoName(
     repoNameUpdatedAt: new Date().toISOString()
   }));
 }
-
-export async function loadApiKey(
-  repoRoot: string
-): Promise<string | undefined> {
-  const metadata = await readMetadata(repoRoot);
-  const apiKey = metadata.apiKey;
-  return typeof apiKey === "string" && apiKey.trim() ? apiKey : undefined;
-}
-
-export async function saveApiKey(
-  repoRoot: string,
-  apiKey: string
-): Promise<void> {
-  await updateMetadata(repoRoot, (current) => ({
-    ...current,
-    apiKey,
-    apiKeyUpdatedAt: new Date().toISOString()
-  }));
-}

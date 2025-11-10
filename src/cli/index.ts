@@ -12,7 +12,6 @@ try {
 
 import { Command } from "commander";
 
-import { registerInitCommand } from "./init.js";
 import { registerIndexCommand } from "./index-cmd.js";
 import { registerServeCommand } from "./serve.js";
 import { registerChatCommand } from "./chat-cmd.js";
@@ -36,7 +35,6 @@ registerLogoutCommand(program);
 registerModelsCommand(program);
 
 // Other commands
-registerInitCommand(program);
 registerIndexCommand(program);
 registerServeCommand(program, metrics);
 registerChatCommand(program);

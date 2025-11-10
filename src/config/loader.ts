@@ -2,7 +2,6 @@ import fs from "fs/promises";
 import path from "path";
 import YAML from "yaml";
 
-import { loadApiKey } from "../utils/repo-name-store.js";
 import { loadAuthTokens } from "../utils/token-manager.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
 import { ScoutConfigSchema, type ScoutConfig, type LLMConfig } from "./schema.js";
@@ -181,16 +180,6 @@ export async function loadConfig(configPath?: string): Promise<ScoutConfig> {
     .reverse();
 
   const parsed = ScoutConfigSchema.parse(mergedConfig);
-
-  const repoRoot = process.cwd();
-  const storedApiKey = await loadApiKey(repoRoot);
-
-  if (storedApiKey) {
-    parsed.cloud = {
-      ...parsed.cloud,
-      api_key: storedApiKey
-    };
-  }
 
   if (parsed.cloud?.enabled) {
     const cloudConfig = parsed.cloud;

@@ -1,8 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
 import { Command } from "commander";
-import readline from "node:readline/promises";
-import { stdin as input, stdout as output } from "node:process";
 import chokidar from "chokidar";
 import ora from "ora";
 
@@ -18,7 +16,6 @@ import { detectStacks } from "../core/indexer/stack-detector.js";
 import { getIgnorePatternsForStacks } from "../core/indexer/ignore-patterns.js";
 import {
   loadSavedRepoName,
-  RepoNameNotConfiguredError,
   saveRepoName
 } from "../utils/repo-name-store.js";
 
@@ -33,42 +30,18 @@ interface WatchContext {
 async function promptRepoName(repoRoot: string): Promise<string> {
   const currentRepoName = await loadSavedRepoName(repoRoot);
 
-  // If repo name doesn't exist and we're in non-interactive mode, throw error
-  if (!currentRepoName && (!process.stdin.isTTY || !process.stdout.isTTY)) {
-    throw new RepoNameNotConfiguredError(repoRoot);
-  }
-
-  // If repo name exists and we're in non-interactive mode, use it
-  if (currentRepoName && (!process.stdin.isTTY || !process.stdout.isTTY)) {
-    logger.info(
-      `No interactive terminal detected. Using repo name "${currentRepoName}" for ${repoRoot}.`
-    );
+  // If repo name exists, use it
+  if (currentRepoName) {
+    logger.info(`Using repo name "${currentRepoName}" for ${repoRoot}.`);
     return currentRepoName;
   }
 
-  // Interactive mode: prompt for repo name
-  const rl = readline.createInterface({ input, output });
-  try {
-    const promptMessage = currentRepoName
-      ? `What do you want to name this indexed repository? (current: ${currentRepoName}, press Enter to keep): `
-      : `What do you want to name this indexed repository?: `;
-
-    const answer = await rl.question(promptMessage);
-    const trimmed = answer.trim();
-
-    // If user provided a name, use it. If they left it blank and there's a current name, keep it.
-    // If they left it blank and there's no current name, prompt again or throw error
-    const finalName = trimmed || currentRepoName;
-
-    if (!finalName) {
-      throw new Error("Repository name cannot be empty");
-    }
-
-    await saveRepoName(repoRoot, finalName);
-    return finalName;
-  } finally {
-    rl.close();
-  }
+  // Auto-generate repo name from directory name
+  const dirName = path.basename(path.resolve(repoRoot));
+  const repoName = dirName || "default";
+  await saveRepoName(repoRoot, repoName);
+  logger.info(`Using repo name: ${repoName}`);
+  return repoName;
 }
 
 async function buildFullIndexRequest(
@@ -188,20 +161,15 @@ export async function ensureIndexedAndWatching(
   config: ScoutConfig,
   client: MossClient
 ): Promise<string> {
-  // Get or prompt for repo name
+  // Get or auto-generate repo name based on directory
   let repoName = await loadSavedRepoName(repoPath);
-  
+
   if (!repoName) {
-    // Non-interactive mode: use a default name based on directory
-    if (!process.stdin.isTTY || !process.stdout.isTTY) {
-      const dirName = path.basename(path.resolve(repoPath));
-      repoName = dirName || "default";
-      await saveRepoName(repoPath, repoName);
-      logger.info(`Using default repo name: ${repoName}`);
-    } else {
-      // Interactive mode: prompt user
-      repoName = await promptRepoName(repoPath);
-    }
+    // Always use directory name as default (non-interactive)
+    const dirName = path.basename(path.resolve(repoPath));
+    repoName = dirName || "default";
+    await saveRepoName(repoPath, repoName);
+    logger.info(`Using repo name: ${repoName}`);
   }
 
   // Check if already indexed

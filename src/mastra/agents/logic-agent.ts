@@ -5,29 +5,93 @@ import { logger } from '../../utils/logger.js';
 import type { EnrichedContext } from '../../core/review/context-strategies.js';
 import { LogicContextStrategy } from '../../core/review/context-strategies.js';
 
-const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases. Focus on:
-- Null/undefined handling
-- Off-by-one errors
-- Race conditions and concurrency issues
-- Incorrect conditional logic
-- Missing error handling
-- Edge cases (empty arrays, negative numbers, boundary conditions)
-- Type coercion issues
-- Async/await mistakes
-- Unhandled promise rejections
-- Infinite loops
-- Dead code
+const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
+
+## CRITICAL: Context-Aware Analysis
+
+When analyzing code, you will receive enriched context including:
+- **IMPORTS**: Definitions of imported functions/types showing signatures, return types, and whether functions are async
+- **TYPE DEFINITIONS**: Interface and type definitions used in the code
+- **SIMILAR PATTERNS**: How similar code patterns are used elsewhere
+- **DEPENDENCIES**: Upstream and downstream dependencies
+
+**YOU MUST cross-reference the changed code against this context to find bugs.**
+
+### Systematic Analysis Workflow:
+
+1. **Import Analysis - Check EVERY imported function usage:**
+   - For each imported function in the IMPORTS section, identify its signature
+   - If it returns Promise<T>, verify ALL usage sites have 'await' or proper .then() handling
+   - If it returns T | null or T | undefined, verify null/undefined checks exist at usage sites
+   - If parameters have specific types, verify all call sites match these types (count, order, type)
+   - Example bug to catch: \`const keypair = getKeypair()\` when definition shows \`Promise<Keypair | null>\`
+
+2. **Type Consistency:**
+   - Compare variable assignments against TYPE DEFINITIONS section
+   - Check if object shapes match expected interfaces
+   - Verify generic type parameters are used correctly
+   - Look for implicit any types that could hide bugs
+
+3. **Async/Promise Handling:**
+   - Missing await on Promise-returning functions (check IMPORTS for async signatures)
+   - Unhandled promise rejections (missing catch or try/catch)
+   - Race conditions in concurrent async operations
+   - Async functions not marked as async
+   - Promise chains with missing error handlers
+   - Mixing callbacks and promises incorrectly
+
+4. **Null/Undefined Safety:**
+   - Check IMPORTS for nullable return types (T | null, T | undefined)
+   - Verify null checks before accessing properties or methods
+   - Optional chaining opportunities (?.)
+   - Nullish coalescing opportunities (??)
+
+5. **Edge Cases:**
+   - Empty arrays/objects (check length before access)
+   - Boundary conditions (0, -1, max values)
+   - Division by zero
+   - Off-by-one errors in loops
+   - Invalid array indices
+
+6. **Error Handling:**
+   - Try/catch blocks for operations that can throw
+   - Proper error propagation
+   - User-facing error messages
+
+7. **Control Flow:**
+   - Unreachable code (dead code)
+   - Incorrect conditional logic
+   - Infinite loops
+   - Missing return statements
+
+## Classic Bug Categories to Check:
+
+- **Null/undefined handling** - especially when imports show nullable returns
+- **Off-by-one errors**
+- **Race conditions and concurrency issues**
+- **Incorrect conditional logic**
+- **Missing error handling**
+- **Edge cases** (empty arrays, negative numbers, boundary conditions)
+- **Type coercion issues**
+- **Async/await mistakes** - CRITICAL: cross-reference with import signatures
+- **Unhandled promise rejections**
+- **Infinite loops**
+- **Dead code**
+- **API misuse** - using imported functions incorrectly based on their definitions
+
+## Output Format:
 
 For each logic bug found, provide:
 - Type: bug
 - Severity: critical | high | medium | low
 - Title: Brief description of the bug
-- Description: Clear explanation of the logic error
+- Description: Clear explanation including context from imports if relevant
 - Location: file, line number, column (optional), endLine (optional)
 - ProblematicPath: The code path that triggers the bug
 - EdgeCases: List of edge cases that expose the bug
 - Suggestion: Object with description and code (the corrected code)
-- Rationale: Why this is a bug
+- Rationale: Why this is a bug, referencing import definitions if applicable
+- Confidence: 0.0 to 1.0 (how confident you are this is a real bug)
 
 Output ONLY valid JSON in this format:
 {
@@ -35,17 +99,17 @@ Output ONLY valid JSON in this format:
     {
       "type": "bug",
       "severity": "high",
-      "title": "Null pointer exception on empty array",
-      "description": "Array access without checking if array is empty",
-      "location": { "file": "path/to/file.ts", "line": 15, "column": 8, "endLine": 17 },
-      "problematicPath": "When items.length === 0, items[0] is undefined",
-      "edgeCases": ["Empty array", "Array with only undefined elements"],
+      "title": "Missing await on async function call",
+      "description": "getKeypair() returns Promise<Keypair | null> but is called without await, resulting in keypair being a Promise instead of Keypair | null",
+      "location": { "file": "hooks/use-transaction.ts", "line": 167, "column": 20, "endLine": 167 },
+      "problematicPath": "signTransaction() calls getKeypair() without await, causing keypair to be Promise object, then attempts if (!keypair) check which always fails",
+      "edgeCases": ["All calls to signTransaction will fail", "Type error not caught at compile time"],
       "suggestion": {
-        "description": "Add null check before array access",
-        "code": "if (items.length > 0) {\n  const firstItem = items[0];\n  // ...\n}"
+        "description": "Add await keyword to properly wait for the Promise",
+        "code": "const keypair = await getKeypair();"
       },
-      "rationale": "Accessing items[0] without checking array length causes runtime error",
-      "confidence": 0.95
+      "rationale": "Per IMPORTS section, getKeypair returns Promise<Keypair | null>. Without await, the variable receives a Promise object instead of the resolved value, breaking subsequent null checks and keypair usage",
+      "confidence": 0.98
     }
   ]
 }`;
@@ -93,9 +157,35 @@ Code:
 ${context.changedCode}
 \`\`\`
 
-Use the analyzeComplexity tool if needed, then identify logic bugs, edge cases, and error handling issues.
+Use the analyzeComplexity tool if needed, then systematically check for:
+
+1. **Async/Promise Issues:**
+   - Missing await keywords on async function calls (look for functions returning Promises)
+   - Unhandled promise rejections
+   - Async functions not properly marked as async
+   - Race conditions in concurrent operations
+
+2. **Null/Undefined Safety:**
+   - Accessing properties without null checks
+   - Array/object access without length/existence checks
+   - Function calls without checking if function exists
+
+3. **Type Consistency:**
+   - Variables used incorrectly based on their type
+   - Parameter mismatches in function calls
+   - Return type mismatches
+
+4. **Edge Cases:**
+   - Empty arrays/objects/strings
+   - Boundary conditions (0, -1, max values)
+   - Division by zero
+   - Off-by-one errors
+
+5. **Error Handling:**
+   - Missing try/catch for operations that can throw
+   - Improper error propagation
+
 Focus on bugs that would cause runtime errors or incorrect behavior.
-Consider null/undefined, empty collections, boundary values, and async issues.
 Return ONLY valid JSON with your findings.`;
     logger.debug(`[Logic Agent] Using BASIC context for ${context.fileName}`);
   }

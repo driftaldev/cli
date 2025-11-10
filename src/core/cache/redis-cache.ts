@@ -14,18 +14,18 @@ export class RedisCache<T> {
     this.client = new Redis(options.url, {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
-      ...options.redisOptions
+      ...options.redisOptions,
     });
   }
 
   async connect(): Promise<void> {
-    if (['ready', 'connecting', 'reconnecting'].includes(this.client.status)) {
+    if (["ready", "connecting", "reconnecting"].includes(this.client.status)) {
       return;
     }
     try {
       await this.client.connect();
     } catch (error) {
-      console.error('Failed to connect to Redis:', error);
+      console.error("Failed to connect to Redis:", error);
       throw error;
     }
   }
@@ -45,10 +45,10 @@ export class RedisCache<T> {
       if (isValid(value)) {
         return JSON.parse(value) as T;
       } else {
-        throw new Error('Invalid data');
+        throw new Error("Invalid data");
       }
     } catch (error) {
-      console.error('Failed to parse JSON:', error);
+      console.error("Failed to parse JSON:", error);
       return undefined;
     }
   }
@@ -56,7 +56,7 @@ export class RedisCache<T> {
   async set(key: string, value: T, ttlSeconds?: number): Promise<void> {
     const ttl = ttlSeconds ?? this.options.defaultTtlSeconds;
     const encodedValue = msgpack.encode(value); // Using MessagePack or similar library
-    await this.client.set(key, encodedValue, 'EX', ttl);
+    await this.client.set(key, encodedValue, "EX", ttl);
   }
 
   async delete(key: string): Promise<void> {

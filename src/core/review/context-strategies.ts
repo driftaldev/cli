@@ -136,6 +136,7 @@ export class SecurityContextStrategy implements ContextStrategy {
       fileName: context.fileName,
       changedCode: context.changedCode,
       language: context.language,
+      fullContent: context.fullContent,
       imports: this.mapRankedToImports(rankedImports, context.imports || []),
       typeDefinitions: this.mapRankedToTypes(rankedTypes, context.typeDefinitions || []),
       similarPatterns: this.mapRankedToPatterns(rankedPatterns, context.similarPatterns || []),
@@ -283,6 +284,7 @@ export class PerformanceContextStrategy implements ContextStrategy {
       fileName: context.fileName,
       changedCode: context.changedCode,
       language: context.language,
+      fullContent: context.fullContent,
       imports: this.mapRankedToImports(rankedImports, context.imports || []),
       similarPatterns: this.mapRankedToPatterns(rankedPatterns, context.similarPatterns || []),
       dependencies: {
@@ -452,6 +454,7 @@ export class LogicContextStrategy implements ContextStrategy {
       fileName: context.fileName,
       changedCode: context.changedCode,
       language: context.language,
+      fullContent: context.fullContent,
       imports: this.mapRankedToImports(rankedImports, context.imports || []),
       typeDefinitions: this.mapRankedToTypes(rankedTypes, context.typeDefinitions || []),
       similarPatterns: this.mapRankedToPatterns(rankedPatterns, context.similarPatterns || []),

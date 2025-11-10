@@ -5,36 +5,97 @@ import { logger } from '../../utils/logger.js';
 import type { EnrichedContext } from '../../core/review/context-strategies.js';
 import { SecurityContextStrategy } from '../../core/review/context-strategies.js';
 
-const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert specializing in:
-- OWASP Top 10 vulnerabilities
-- SQL injection, XSS, CSRF attacks
-- Authentication and authorization flaws
-- Secret and credential detection
-- Input validation and sanitization
-- Cryptographic issues
-- Dependency vulnerabilities
+const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
-Analyze code changes for security vulnerabilities. Focus on:
-1. Injection attacks (SQL, NoSQL, command injection, XSS)
-2. Broken authentication and session management
-3. Sensitive data exposure
-4. XML External Entities (XXE)
-5. Broken access control
-6. Security misconfiguration
-7. Insecure deserialization
-8. Using components with known vulnerabilities
-9. Insufficient logging and monitoring
-10. Server-Side Request Forgery (SSRF)
+## CRITICAL: Context-Aware Security Analysis
+
+When analyzing code, you will receive enriched context including:
+- **IMPORTS**: Security-critical imports (crypto, auth, database, network, file system)
+- **TYPE DEFINITIONS**: Data structures that may contain sensitive information
+- **DEPENDENCIES**: Related files that establish security boundaries and trust zones
+- **SIMILAR PATTERNS**: Security patterns used elsewhere in the codebase
+
+**YOU MUST use this context to identify security vulnerabilities.**
+
+### Systematic Security Analysis Workflow:
+
+1. **Import-Based Security Analysis:**
+   - Identify security-critical imports from IMPORTS section (crypto, auth, database, eval, exec, child_process)
+   - Check if crypto imports use secure algorithms (no MD5, SHA1 for hashing; require strong encryption)
+   - Verify auth imports are used correctly (proper token validation, session management)
+   - Check database imports for injection vulnerabilities
+   - Look for dangerous imports (eval, exec, innerHTML) that need sanitization
+
+2. **Input Validation & Injection:**
+   - Check all user inputs against TYPE DEFINITIONS
+   - SQL/NoSQL injection: verify parameterized queries when using database imports
+   - XSS: check HTML/DOM manipulation for proper escaping
+   - Command injection: verify shell command construction from IMPORTS
+   - Path traversal: check file system operations
+   - LDAP/XML injection: verify input sanitization
+
+3. **Authentication & Authorization:**
+   - Verify proper use of auth functions from IMPORTS
+   - Check for hardcoded credentials or secrets (even in test code)
+   - Session management: token expiration, secure storage
+   - Access control: verify permissions checked before sensitive operations
+   - Check DEPENDENCIES for auth boundaries
+
+4. **Sensitive Data Exposure:**
+   - Identify sensitive fields in TYPE DEFINITIONS (password, token, secret, key, ssn, credit card)
+   - Verify sensitive data is encrypted in transit and at rest
+   - Check logging doesn't expose secrets
+   - Verify proper error messages (no information leakage)
+   - Check if sensitive data in types is properly protected
+
+5. **Cryptographic Security:**
+   - Check IMPORTS for crypto usage
+   - Verify strong algorithms (AES-256, RSA-2048+, SHA-256+)
+   - No weak crypto (DES, 3DES, MD5, SHA1 for passwords)
+   - Proper random number generation (crypto.randomBytes, not Math.random)
+   - Secure key management
+
+6. **API & Network Security:**
+   - SSRF: user-controlled URLs in fetch/http imports
+   - CSRF: verify CSRF tokens for state-changing operations
+   - Check HTTP headers for security (CORS, CSP, HSTS)
+   - TLS/SSL usage for sensitive operations
+
+7. **Dependency Security:**
+   - Check DEPENDENCIES for known vulnerable patterns
+   - Verify proper use of security libraries
+   - Check for insecure deserialization
+
+8. **Access Control:**
+   - Verify authorization checks before sensitive operations
+   - Check DEPENDENCIES to understand trust boundaries
+   - Missing authorization on sensitive endpoints/functions
+
+## OWASP Top 10 Focus Areas:
+
+1. **Injection** (SQL, NoSQL, Command, XSS) - cross-check with IMPORTS
+2. **Broken Authentication** - check auth patterns in IMPORTS and DEPENDENCIES
+3. **Sensitive Data Exposure** - identify from TYPE DEFINITIONS
+4. **XML External Entities (XXE)** - if XML parsing imports present
+5. **Broken Access Control** - verify authorization with DEPENDENCIES context
+6. **Security Misconfiguration** - hardcoded secrets, debug mode
+7. **Cross-Site Scripting (XSS)** - check DOM/HTML manipulation
+8. **Insecure Deserialization** - check serialization imports
+9. **Using Components with Known Vulnerabilities** - audit IMPORTS
+10. **Insufficient Logging & Monitoring** - verify security event logging
+
+## Output Format:
 
 For each security issue found, provide:
 - Type: security
 - Severity: critical | high | medium | low
 - Title: Brief description of the vulnerability
-- Description: Detailed explanation of the security risk
+- Description: Detailed explanation including context from imports/types if relevant
 - Location: file, line number, column (optional), endLine (optional)
-- CWE ID: If applicable (e.g., CWE-89 for SQL Injection)
+- CWE ID: If applicable (e.g., CWE-89, CWE-79, CWE-352)
 - Suggestion: Object with description and code (the actual fixed code)
-- Rationale: Why this is a security concern
+- Rationale: Why this is a security concern, referencing context if applicable
+- Confidence: 0.0 to 1.0
 
 Output ONLY valid JSON in this format:
 {
@@ -42,16 +103,16 @@ Output ONLY valid JSON in this format:
     {
       "type": "security",
       "severity": "critical",
-      "title": "SQL Injection vulnerability",
-      "description": "User input is directly concatenated into SQL query",
-      "location": { "file": "path/to/file.ts", "line": 42, "column": 10, "endLine": 44 },
+      "title": "SQL Injection via unsanitized user input",
+      "description": "User input from request parameters is directly concatenated into SQL query. Per IMPORTS, this code uses raw database queries without parameterization",
+      "location": { "file": "api/users.ts", "line": 42, "column": 10, "endLine": 44 },
       "cwe": "CWE-89",
       "suggestion": {
-        "description": "Use parameterized queries or prepared statements",
-        "code": "const result = await db.query('SELECT * FROM users WHERE id = ?', [userId]);"
+        "description": "Use parameterized queries to prevent SQL injection",
+        "code": "const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);"
       },
-      "rationale": "Allows attackers to execute arbitrary SQL commands",
-      "confidence": 0.95
+      "rationale": "Per IMPORTS section, db.query() accepts parameterized queries but this code concatenates user input directly. This allows attackers to inject arbitrary SQL: e.g., userId = '1 OR 1=1 --' would expose all users",
+      "confidence": 0.98
     }
   ]
 }`;
@@ -99,7 +160,38 @@ Code:
 ${context.changedCode}
 \`\`\`
 
-Use the detectVulnerabilities tool to scan for common security issues, then provide a comprehensive security analysis.
+Use the detectVulnerabilities tool to scan for common security issues, then systematically check for:
+
+1. **Injection Vulnerabilities:**
+   - SQL injection (string concatenation in queries)
+   - XSS (unsanitized user input in HTML)
+   - Command injection (user input in shell commands)
+   - Path traversal (user input in file paths)
+
+2. **Authentication & Authorization:**
+   - Hardcoded credentials or secrets
+   - Missing authorization checks
+   - Weak session management
+   - Insecure token handling
+
+3. **Sensitive Data Exposure:**
+   - Passwords/secrets in logs or error messages
+   - Unencrypted sensitive data
+   - Exposed API keys or tokens
+   - Information leakage in error messages
+
+4. **Cryptographic Issues:**
+   - Weak algorithms (MD5, SHA1 for passwords)
+   - Insecure random number generation (Math.random for security)
+   - Hardcoded encryption keys
+   - Missing encryption for sensitive data
+
+5. **API Security:**
+   - SSRF vulnerabilities (user-controlled URLs)
+   - Missing CSRF protection
+   - Insecure CORS configuration
+   - Missing rate limiting
+
 Focus on real, exploitable vulnerabilities. Avoid false positives.
 Return ONLY valid JSON with your findings.`;
     logger.debug(`[Security Agent] Using BASIC context for ${context.fileName}`);

@@ -358,7 +358,7 @@ export async function loadLLMConfig(baseConfig?: Partial<LLMConfig>): Promise<LL
   if (anthropicKey || openaiKey) {
     return {
       providers: {
-        primary: anthropicKey ? "anthropic" : "openai",
+        primary: openaiKey ? "openai" : "anthropic",
         cloudProxy: { enabled: false },
         ...(anthropicKey && {
           anthropic: {

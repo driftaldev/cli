@@ -81,7 +81,7 @@ export class MastraReviewOrchestrator {
         }
 
         const proxyUrl = llmConfig.providers.cloudProxy?.proxyUrl || DEFAULT_PROXY_URL;
-        const selectedModel = tokens.selectedModels?.primary || 'anthropic/claude-3-5-sonnet-20241022';
+        const selectedModel = tokens.selectedModels?.primary || 'openai/gpt-4-turbo';
         const { providerId, modelId } = this.parseModelIdentifier(selectedModel);
 
         return {
@@ -99,7 +99,7 @@ export class MastraReviewOrchestrator {
         return `anthropic/${model}`;
       }
       case 'openai': {
-        const model = llmConfig.providers.openai?.model || 'gpt-4o-mini';
+        const model = llmConfig.providers.openai?.model || 'gpt-4-turbo';
         return `openai/${model}`;
       }
       case 'ollama': {

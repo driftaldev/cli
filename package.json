@@ -53,6 +53,7 @@
     "ignore": "^5.3.1",
     "ink": "^5.2.0",
     "inquirer": "^12.2.0",
+    "inquirer-search-list": "^1.2.6",
     "ioredis": "^5.3.2",
     "node-notifier": "^10.0.1",
     "openai": "^4.73.0",

@@ -14,6 +14,94 @@ import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
 import { runSecurityAnalysisWithContext } from "../agents/security-agent.js";
 import { runPerformanceAnalysisWithContext } from "../agents/performance-agent.js";
 import { runLogicAnalysisWithContext } from "../agents/logic-agent.js";
+import { promises as fs } from "fs";
+import path from "path";
+
+/**
+ * Utility function to log context to .scout-code folder
+ */
+async function logContextToFile(
+  filePath: string,
+  agentName: string,
+  context: any
+): Promise<void> {
+  try {
+    // Get the working directory (where CLI is run from)
+    const workingDir = process.cwd();
+    const scoutCodeDir = path.join(workingDir, ".scout-code");
+
+    // Ensure .scout-code directory exists
+    await fs.mkdir(scoutCodeDir, { recursive: true });
+
+    // Create filename: <filename>_<agentName>_<timestamp>.txt
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const baseFileName = path.basename(filePath).replace(/\//g, "_");
+    const logFileName = `${baseFileName}_${agentName}_${timestamp}.txt`;
+    const logFilePath = path.join(scoutCodeDir, logFileName);
+
+    // Format the context for logging
+    const logContent = `
+================================================================================
+CONTEXT LOG FOR FILE: ${filePath}
+AGENT: ${agentName}
+TIMESTAMP: ${new Date().toISOString()}
+================================================================================
+
+FILE NAME: ${context.fileName || "N/A"}
+LANGUAGE: ${context.language || "N/A"}
+
+================================================================================
+CHANGED CODE:
+================================================================================
+${context.changedCode || "N/A"}
+
+================================================================================
+FULL FILE CONTENT:
+================================================================================
+${context.fullContent || "N/A"}
+
+================================================================================
+IMPORTS (${context.imports?.length || 0}):
+================================================================================
+${context.imports ? JSON.stringify(context.imports, null, 2) : "None"}
+
+================================================================================
+TYPE DEFINITIONS (${context.typeDefinitions?.length || 0}):
+================================================================================
+${context.typeDefinitions ? JSON.stringify(context.typeDefinitions, null, 2) : "None"}
+
+================================================================================
+SIMILAR PATTERNS (${context.similarPatterns?.length || 0}):
+================================================================================
+${context.similarPatterns ? JSON.stringify(context.similarPatterns, null, 2) : "None"}
+
+================================================================================
+DEPENDENCIES - UPSTREAM (${context.dependencies?.upstream?.length || 0}):
+================================================================================
+${context.dependencies?.upstream ? JSON.stringify(context.dependencies.upstream, null, 2) : "None"}
+
+================================================================================
+DEPENDENCIES - DOWNSTREAM (${context.dependencies?.downstream?.length || 0}):
+================================================================================
+${context.dependencies?.downstream ? JSON.stringify(context.dependencies.downstream, null, 2) : "None"}
+
+================================================================================
+RELATED TESTS (${context.relatedTests?.length || 0}):
+================================================================================
+${context.relatedTests ? JSON.stringify(context.relatedTests, null, 2) : "None"}
+
+================================================================================
+END OF CONTEXT LOG
+================================================================================
+`;
+
+    // Write to file
+    await fs.writeFile(logFilePath, logContent, "utf-8");
+    logger.debug(`[ContextLogger] Context logged to: ${logFilePath}`);
+  } catch (error) {
+    logger.error(`[ContextLogger] Failed to log context: ${error}`);
+  }
+}
 
 /**
  * Step 1: Analyze changes to understand complexity and risk
@@ -248,6 +336,9 @@ export const runAllAgentsInParallelStep = createStep({
             language: file.language,
           };
         }
+
+        // Log the context being passed to the agent
+        await logContextToFile(file.path, agentName, context);
 
         // Run the agent-specific analysis function
         const fileIssues = await analysisFn(agent, context);

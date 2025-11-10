@@ -3,17 +3,17 @@
  * Analyzes import relationships and builds dependency trees
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import { logger } from '../../utils/logger';
-import { execSync } from 'child_process';
+import { promises as fs } from "fs";
+import path from "path";
+import { logger } from "../../utils/logger";
+import { MossClient } from "../indexer/moss-client.js";
 
 export interface DependencyNode {
   filePath: string;
   imports: string[]; // Resolved file paths
   exports: string[]; // Export names
   depth: number;
-  relationship: 'upstream' | 'downstream' | 'self';
+  relationship: "upstream" | "downstream" | "self";
 }
 
 export interface TestFile {
@@ -33,10 +33,14 @@ export interface DependencyGraphOptions {
  */
 export class DependencyGraphBuilder {
   private repoPath: string;
+  private repoName: string;
+  private mossClient: MossClient;
   private fileCache: Map<string, string> = new Map();
 
-  constructor(repoPath: string, repoName?: string) {
+  constructor(repoPath: string, repoName: string, mossClient: MossClient) {
     this.repoPath = repoPath;
+    this.repoName = repoName;
+    this.mossClient = mossClient;
   }
 
   /**
@@ -50,34 +54,99 @@ export class DependencyGraphBuilder {
     downstream: DependencyNode[];
     tests: TestFile[];
   }> {
-    const { maxDepth = 2, includeTests = true, includeNodeModules = false } = options;
-    logger.debug(`[DependencyGraph] Building graph for ${filePath} (maxDepth=${maxDepth})`);
+    const {
+      maxDepth = 2,
+      includeTests = true,
+      includeNodeModules = false,
+    } = options;
+    logger.debug(
+      `[DependencyGraph] Building graph for ${filePath} (maxDepth=${maxDepth})`
+    );
     const startTime = Date.now();
 
     try {
       // Get upstream dependencies (what this file imports)
       logger.debug(`[DependencyGraph] Finding upstream dependencies...`);
-      const upstream = await this.getUpstreamDependencies(filePath, maxDepth, includeNodeModules);
-      logger.debug(`[DependencyGraph] Found ${upstream.length} upstream dependencies`);
+      const upstream = await this.getUpstreamDependencies(
+        filePath,
+        maxDepth,
+        includeNodeModules
+      );
+      logger.debug(
+        `[DependencyGraph] Found ${upstream.length} upstream dependencies`
+      );
+
+      // Log upstream dependencies for verification
+      if (upstream.length > 0) {
+        logger.info(
+          `[DependencyGraph] ===== UPSTREAM DEPENDENCIES FOR ${filePath} =====`
+        );
+        upstream.forEach((dep, index) => {
+          logger.info(
+            `[DependencyGraph]   [${index + 1}] ${dep.filePath} (depth: ${
+              dep.depth
+            })`
+          );
+          logger.info(
+            `[DependencyGraph]       imports: [${dep.imports.join(", ")}]`
+          );
+        });
+        logger.info(`[DependencyGraph] ===== END UPSTREAM DEPENDENCIES =====`);
+      } else {
+        logger.info(
+          `[DependencyGraph] No upstream dependencies found for ${filePath}`
+        );
+      }
 
       // Get downstream dependencies (what imports this file)
       logger.debug(`[DependencyGraph] Finding downstream dependencies...`);
-      const downstream = await this.getDownstreamDependencies(filePath, maxDepth);
-      logger.debug(`[DependencyGraph] Found ${downstream.length} downstream dependencies`);
+      const downstream = await this.getDownstreamDependencies(
+        filePath,
+        maxDepth
+      );
+      logger.debug(
+        `[DependencyGraph] Found ${downstream.length} downstream dependencies`
+      );
+
+      // Log downstream dependencies for verification
+      if (downstream.length > 0) {
+        logger.info(
+          `[DependencyGraph] DOWNSTREAM DEPENDENCIES FOR ${filePath}`
+        );
+        downstream.forEach((dep, index) => {
+          logger.info(
+            `[DependencyGraph]   [${index + 1}] ${dep.filePath} (depth: ${
+              dep.depth
+            })`
+          );
+          logger.info(
+            `[DependencyGraph]       imports from target: ${dep.imports[0]}`
+          );
+        });
+      } else {
+        logger.info(
+          `[DependencyGraph] No downstream dependencies found for ${filePath}`
+        );
+      }
 
       // Find related tests
       const tests = includeTests ? await this.findRelatedTests(filePath) : [];
-      logger.debug(`[DependencyGraph] Found ${tests.length} related test files`);
+      logger.debug(
+        `[DependencyGraph] Found ${tests.length} related test files`
+      );
 
       const duration = Date.now() - startTime;
       logger.debug(
         `[DependencyGraph] Graph built in ${duration}ms: ` +
-        `${upstream.length} upstream, ${downstream.length} downstream, ${tests.length} tests`
+          `${upstream.length} upstream, ${downstream.length} downstream, ${tests.length} tests`
       );
 
       return { upstream, downstream, tests };
     } catch (error) {
-      logger.error(`[DependencyGraph] Error building dependency graph for ${filePath}:`, error);
+      logger.error(
+        `[DependencyGraph] Error building dependency graph for ${filePath}:`,
+        error
+      );
       return { upstream: [], downstream: [], tests: [] };
     }
   }
@@ -103,7 +172,11 @@ export class DependencyGraphBuilder {
       try {
         const content = await this.readFile(currentPath);
         const imports = this.extractImports(content, currentPath);
-        const resolvedImports = await this.resolveImports(imports, currentPath, includeNodeModules);
+        const resolvedImports = await this.resolveImports(
+          imports,
+          currentPath,
+          includeNodeModules
+        );
 
         if (depth > 0) {
           dependencies.push({
@@ -111,13 +184,15 @@ export class DependencyGraphBuilder {
             imports: resolvedImports.map((imp) => imp.resolvedPath),
             exports: this.extractExports(content),
             depth,
-            relationship: 'upstream',
+            relationship: "upstream",
           });
         }
 
-        // Recursively traverse imports
-        for (const imp of resolvedImports) {
-          await traverse(imp.resolvedPath, depth + 1);
+        // Recursively traverse imports (only if we haven't reached max depth)
+        if (depth < maxDepth) {
+          for (const imp of resolvedImports) {
+            await traverse(imp.resolvedPath, depth + 1);
+          }
         }
       } catch (error) {
         // File might not exist or be readable, skip
@@ -147,7 +222,12 @@ export class DependencyGraphBuilder {
 
     for (const dir of searchDirs) {
       try {
-        const files = await this.getAllFiles(dir, ['.ts', '.tsx', '.js', '.jsx']);
+        const files = await this.getAllFiles(dir, [
+          ".ts",
+          ".tsx",
+          ".js",
+          ".jsx",
+        ]);
 
         for (const file of files) {
           if (file === filePath) continue;
@@ -156,19 +236,27 @@ export class DependencyGraphBuilder {
             const content = await this.readFile(file);
             const imports = this.extractImports(content, file);
 
-            // Check if this file imports our target
-            for (const imp of imports) {
-              const resolved = await this.resolveImportPath(imp, file);
-              if (resolved && path.normalize(resolved) === path.normalize(filePath)) {
-                dependencies.push({
-                  filePath: file,
-                  imports: [filePath],
-                  exports: this.extractExports(content),
-                  depth: 1,
-                  relationship: 'downstream',
-                });
-                break;
-              }
+            // Resolve all imports in parallel and check if any match our target
+            const resolvedImports = await this.resolveImports(
+              imports,
+              file,
+              false
+            );
+
+            const importsTargetFile = resolvedImports.some(
+              (resolved) =>
+                path.normalize(resolved.resolvedPath) ===
+                path.normalize(filePath)
+            );
+
+            if (importsTargetFile) {
+              dependencies.push({
+                filePath: file,
+                imports: [filePath],
+                exports: this.extractExports(content),
+                depth: 1,
+                relationship: "downstream",
+              });
             }
           } catch (error) {
             // Skip files that can't be read
@@ -186,7 +274,9 @@ export class DependencyGraphBuilder {
    * Find related test files
    */
   private async findRelatedTests(filePath: string): Promise<TestFile[]> {
-    logger.debug(`[DependencyGraph] Searching for tests related to ${filePath}`);
+    logger.debug(
+      `[DependencyGraph] Searching for tests related to ${filePath}`
+    );
     const tests: TestFile[] = [];
     const fileDir = path.dirname(filePath);
     const fileName = path.basename(filePath, path.extname(filePath));
@@ -216,7 +306,7 @@ export class DependencyGraphBuilder {
     }
 
     // Check __tests__ directory
-    const testsDir = path.join(fileDir, '__tests__');
+    const testsDir = path.join(fileDir, "__tests__");
     if (await this.fileExists(testsDir)) {
       logger.debug(`[DependencyGraph] Checking __tests__ directory`);
       for (const pattern of testPatterns) {
@@ -274,115 +364,130 @@ export class DependencyGraphBuilder {
     const namedExportPattern = /export\s+{\s*([^}]+)\s*}/g;
     let match;
     while ((match = namedExportPattern.exec(content)) !== null) {
-      const names = match[1].split(',').map((n) => n.trim().split(/\s+as\s+/)[0]);
+      const names = match[1]
+        .split(",")
+        .map((n) => n.trim().split(/\s+as\s+/)[0]);
       exports.push(...names);
     }
 
     // Export declarations: export const foo = ...
-    const declPattern = /export\s+(?:const|let|var|function|class|interface|type|enum)\s+(\w+)/g;
+    const declPattern =
+      /export\s+(?:const|let|var|function|class|interface|type|enum)\s+(\w+)/g;
     while ((match = declPattern.exec(content)) !== null) {
       exports.push(match[1]);
     }
 
     // Default export
     if (/export\s+default/.test(content)) {
-      exports.push('default');
+      exports.push("default");
     }
 
     return [...new Set(exports)];
   }
 
   /**
-   * Resolve import paths to actual file paths
+   * Extract base path from import for Moss lookup
+   * Examples:
+   *   "@/services/wallet.service" → "services/wallet.service"
+   *   "./utils/helper" → "utils/helper" (relative from current dir)
+   *   "../../core/types" → "core/types" (resolved relative path)
+   */
+  private extractBasePathFromImport(
+    importPath: string,
+    fromFile: string
+  ): string {
+    // Remove leading @ and slash for path aliases
+    if (importPath.startsWith("@/")) {
+      return importPath.substring(2);
+    }
+
+    // For relative imports, resolve them relative to the importing file
+    if (importPath.startsWith("./") || importPath.startsWith("../")) {
+      const fromDir = path.dirname(fromFile);
+      const resolvedPath = path.resolve(fromDir, importPath);
+      return path.relative(this.repoPath, resolvedPath);
+    }
+
+    // Absolute or package imports - return as-is
+    return importPath;
+  }
+
+  /**
+   * Resolve import paths to actual file paths using Moss
    */
   private async resolveImports(
     imports: string[],
     fromFile: string,
     includeNodeModules: boolean
   ): Promise<Array<{ importPath: string; resolvedPath: string }>> {
-    const resolved: Array<{ importPath: string; resolvedPath: string }> = [];
-
-    for (const imp of imports) {
-      // Skip external modules if not including node_modules
+    // Filter imports based on includeNodeModules
+    const localImports = imports.filter((imp) => {
       if (!includeNodeModules) {
-        // Skip if it doesn't look like a local import
-        if (!imp.startsWith('@') && !imp.startsWith('.') && !imp.startsWith('/')) {
-          continue;
-        }
+        // Only include local imports
+        return (
+          imp.startsWith("@") || imp.startsWith(".") || imp.startsWith("/")
+        );
+      }
+      return true;
+    });
+
+    logger.info(
+      `[DependencyGraph] ===== MOSS IMPORT RESOLUTION FOR: ${fromFile} =====`
+    );
+    logger.info(
+      `[DependencyGraph] Total imports to resolve: ${localImports.length}`
+    );
+
+    // Resolve ALL imports in parallel using Promise.all
+    const resolvePromises = localImports.map(async (imp, index) => {
+      const basePath = this.extractBasePathFromImport(imp, fromFile);
+      const extensions = [".ts", ".tsx", ".js", ".jsx"];
+
+      logger.info(
+        `[DependencyGraph] [${index + 1}/${localImports.length}] Resolving import: "${imp}"`
+      );
+      logger.info(`[DependencyGraph]   → Extracted basePath: "${basePath}"`);
+      logger.info(
+        `[DependencyGraph]   → Calling Moss.findIndexedFile(repo="${this.repoName}", basePath="${basePath}", extensions=${JSON.stringify(extensions)})`
+      );
+
+      const resolvedPath = await this.mossClient.findIndexedFile(
+        this.repoName,
+        basePath,
+        extensions
+      );
+
+      logger.info(
+        `[DependencyGraph]   → Moss returned: ${resolvedPath ? `"${resolvedPath}"` : "null"}`
+      );
+
+      if (resolvedPath) {
+        // Convert relative path to absolute
+        const absolutePath = path.resolve(this.repoPath, resolvedPath);
+        logger.info(
+          `[DependencyGraph]   ✓ SUCCESS: "${imp}" → "${absolutePath}"`
+        );
+        return { importPath: imp, resolvedPath: absolutePath };
       }
 
-      const resolvedPath = await this.resolveImportPath(imp, fromFile);
-      if (resolvedPath) {
-        resolved.push({ importPath: imp, resolvedPath });
-      }
-    }
+      logger.info(`[DependencyGraph]   ✗ FAILED: Could not resolve "${imp}"`);
+      return null;
+    });
+
+    const results = await Promise.all(resolvePromises);
+    const resolved = results.filter(
+      (r): r is { importPath: string; resolvedPath: string } => r !== null
+    );
+
+    logger.info(
+      `[DependencyGraph] ===== MOSS RESOLUTION SUMMARY =====`
+    );
+    logger.info(
+      `[DependencyGraph] Total: ${localImports.length} | Resolved: ${resolved.length} | Failed: ${localImports.length - resolved.length}`
+    );
+    logger.info(`[DependencyGraph] ===== END MOSS RESOLUTION =====`);
 
     return resolved;
-  }
-
-  /**
-   * Resolve a single import path using right-to-left grep approach
-   */
-  private async resolveImportPath(importPath: string, fromFile: string): Promise<string | null> {
-    // Extract base filename from import path
-    const parts = importPath.split('/');
-    const baseFileName = parts[parts.length - 1];
-
-    logger.debug(`[DependencyGraph] Resolving import: "${importPath}"`);
-    logger.debug(`[DependencyGraph] Extracted base filename: "${baseFileName}"`);
-
-    // File extensions to try
-    const extensions = ['.ts', '.tsx', '.js', '.jsx'];
-
-    // Try to find file using find command (right-to-left approach)
-    for (const ext of extensions) {
-      const searchPattern = `${baseFileName}${ext}`;
-      logger.debug(`[DependencyGraph] Trying extension: ${ext}`);
-      logger.debug(`[DependencyGraph] Searching for: "${searchPattern}"`);
-
-      try {
-        const cmd = `find "${this.repoPath}" -name "${searchPattern}" -type f 2>/dev/null | head -1`;
-        logger.debug(`[DependencyGraph] Executing command: ${cmd}`);
-
-        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
-        logger.debug(`[DependencyGraph] Command result: ${result ? `"${result}"` : '(empty)'}`);
-
-        if (result) {
-          logger.debug(`[DependencyGraph] ✓ Found "${importPath}" → "${result}"`);
-          return result;
-        } else {
-          logger.debug(`[DependencyGraph] No match for ${ext}, continuing to next extension`);
-        }
-      } catch (error) {
-        logger.debug(`[DependencyGraph] Error during find with ${ext}: ${error}`);
-      }
-    }
-
-    // Also try index files
-    logger.debug(`[DependencyGraph] Trying index files for "${baseFileName}"`);
-    for (const ext of extensions) {
-      logger.debug(`[DependencyGraph] Trying index with extension: ${ext}`);
-
-      try {
-        const cmd = `find "${this.repoPath}" -path "*/${baseFileName}/index${ext}" -type f 2>/dev/null | head -1`;
-        logger.debug(`[DependencyGraph] Executing index command: ${cmd}`);
-
-        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
-        logger.debug(`[DependencyGraph] Index command result: ${result ? `"${result}"` : '(empty)'}`);
-
-        if (result) {
-          logger.debug(`[DependencyGraph] ✓ Found index file for "${importPath}" → "${result}"`);
-          return result;
-        } else {
-          logger.debug(`[DependencyGraph] No index match for ${ext}, continuing`);
-        }
-      } catch (error) {
-        logger.debug(`[DependencyGraph] Error during index find with ${ext}: ${error}`);
-      }
-    }
-
-    logger.debug(`[DependencyGraph] ✗ Could not resolve "${importPath}"`);
-    return null;
   }
 
   /**
@@ -415,7 +520,10 @@ export class DependencyGraphBuilder {
   /**
    * Get all files in directory recursively
    */
-  private async getAllFiles(dir: string, extensions: string[]): Promise<string[]> {
+  private async getAllFiles(
+    dir: string,
+    extensions: string[]
+  ): Promise<string[]> {
     const files: string[] = [];
 
     try {
@@ -424,10 +532,17 @@ export class DependencyGraphBuilder {
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
 
-        if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+        if (
+          entry.isDirectory() &&
+          !entry.name.startsWith(".") &&
+          entry.name !== "node_modules"
+        ) {
           const subFiles = await this.getAllFiles(fullPath, extensions);
           files.push(...subFiles);
-        } else if (entry.isFile() && extensions.some((ext) => entry.name.endsWith(ext))) {
+        } else if (
+          entry.isFile() &&
+          extensions.some((ext) => entry.name.endsWith(ext))
+        ) {
           files.push(fullPath);
         }
       }
@@ -446,7 +561,7 @@ export class DependencyGraphBuilder {
       return this.fileCache.get(filePath)!;
     }
 
-    const content = await fs.readFile(filePath, 'utf-8');
+    const content = await fs.readFile(filePath, "utf-8");
     this.fileCache.set(filePath, content);
     return content;
   }

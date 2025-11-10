@@ -36,7 +36,7 @@ export interface TypeInfo {
  * Main context enrichment engine
  */
 export class ContextEnricher {
-  private depGraphBuilder: DependencyGraphBuilder;
+  private depGraphBuilder: DependencyGraphBuilder | null = null;
   private mossClient: MossClient | null = null;
   private options: Required<ContextEnricherOptions>;
   private fileCache: Map<string, string> = new Map();
@@ -44,12 +44,10 @@ export class ContextEnricher {
   constructor(options: ContextEnricherOptions) {
     this.options = {
       maxSimilarPatterns: 5,
-      maxImportDepth: 2,
+      maxImportDepth: 1,
       includeTests: true,
       ...options,
     };
-
-    this.depGraphBuilder = new DependencyGraphBuilder(options.repoPath);
   }
 
   /**
@@ -71,6 +69,24 @@ export class ContextEnricher {
   }
 
   /**
+   * Lazy initialization of DependencyGraphBuilder with MossClient
+   */
+  private async getDepGraphBuilder(): Promise<DependencyGraphBuilder> {
+    if (this.depGraphBuilder) {
+      return this.depGraphBuilder;
+    }
+
+    const mossClient = await this.getMossClient();
+    this.depGraphBuilder = new DependencyGraphBuilder(
+      this.options.repoPath,
+      this.options.repoName,
+      mossClient
+    );
+
+    return this.depGraphBuilder;
+  }
+
+  /**
    * Enrich context for a file being reviewed
    */
   async enrich(input: {
@@ -88,6 +104,9 @@ export class ContextEnricher {
       const fullContent = await this.readFile(input.fullFilePath);
       logger.debug(`[ContextEnricher] File read complete (${fullContent.length} chars)`);
 
+      // Initialize dependency graph builder with MossClient
+      const depGraphBuilder = await this.getDepGraphBuilder();
+
       // Run all enrichment steps in parallel for speed
       logger.debug(`[ContextEnricher] Starting parallel enrichment steps`);
       const [
@@ -99,7 +118,7 @@ export class ContextEnricher {
         this.extractImports(fullContent, input.fullFilePath, input.language),
         this.extractTypes(fullContent, input.fullFilePath, input.language),
         this.findSimilarPatterns(input.changedCode, input.language, input.fileName),
-        this.depGraphBuilder.buildGraph(input.fullFilePath, {
+        depGraphBuilder.buildGraph(input.fullFilePath, {
           maxDepth: this.options.maxImportDepth,
           includeTests: this.options.includeTests,
         }),
@@ -564,6 +583,8 @@ export class ContextEnricher {
    */
   clearCache(): void {
     this.fileCache.clear();
-    this.depGraphBuilder.clearCache();
+    if (this.depGraphBuilder) {
+      this.depGraphBuilder.clearCache();
+    }
   }
 }

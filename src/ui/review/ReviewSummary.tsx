@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import type { ReviewResults, ReviewIssue, IssueSeverity } from "../../core/review/issue.js";
 import { IssueRanker } from "../../core/review/issue.js";
 
@@ -70,7 +70,7 @@ function DiffBlock({
 }
 
 export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) => {
-  const { Box, Text, useApp } = ink;
+  const { Box, Text, useApp, useInput } = ink;
   const { exit } = useApp();
   const ranker = useMemo(() => new IssueRanker(), []);
 
@@ -81,10 +81,10 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) =>
     });
   }, [ranker, results.issues]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => exit(), 0);
-    return () => clearTimeout(timer);
-  }, [exit]);
+  // Exit when user presses any key
+  useInput(() => {
+    exit();
+  });
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -131,6 +131,11 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) =>
             );
           })
         )}
+      </Box>
+
+      {/* Footer with exit instruction */}
+      <Box marginTop={1}>
+        <Text color="gray" dimColor>Press any key to exit...</Text>
       </Box>
     </Box>
   );

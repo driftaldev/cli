@@ -3,11 +3,14 @@ import prompts from "prompts";
 import { deleteAuthTokens, getAuthStatus } from "../utils/token-manager.js";
 import { logger } from "../utils/logger.js";
 import chalk from "chalk";
+import { showConsoleBanner } from "../ui/components/console-banner.js";
 
 /**
  * Handle logout command
  */
 async function handleLogout(options: { force?: boolean }) {
+  await showConsoleBanner();
+
   try {
     // Check if authenticated
     const status = await getAuthStatus();

@@ -12,6 +12,7 @@ import {
   RepoNameNotConfiguredError,
 } from "../utils/repo-name-store.js";
 import { ensureIndexedAndWatching } from "./index-cmd.js";
+import { showConsoleBanner } from "../ui/components/console-banner.js";
 
 interface ChatOptions {
   maxResults?: number;
@@ -75,7 +76,7 @@ function formatSearchResults(results: any[], queryTime: number): string {
 }
 
 function showWelcome(): void {
-  console.log("\n" + chalk.bold.cyan("🔍 Scout Code Interactive Chat"));
+  console.log(chalk.bold.cyan("🔍 Scout Code Interactive Chat"));
   console.log(chalk.gray("Ask questions about your codebase"));
   console.log(chalk.gray("Commands: /help /clear /exit\n"));
 }
@@ -187,6 +188,9 @@ export function registerChatCommand(program: Command): void {
       "5"
     )
     .action(async (options) => {
+      // Show banner at the very start
+      await showConsoleBanner();
+
       try {
         const config = await loadConfig();
         const repoRoot = process.cwd();

@@ -3,11 +3,14 @@ import { initiateLogin } from "../utils/auth.js";
 import { getAuthStatus } from "../utils/token-manager.js";
 import { logger } from "../utils/logger.js";
 import chalk from "chalk";
+import { showConsoleBanner } from "../ui/components/console-banner.js";
 
 /**
  * Handle login command
  */
 async function handleLogin(options: { reauth?: boolean }) {
+  await showConsoleBanner();
+
   try {
     // Check if already authenticated
     if (!options.reauth) {

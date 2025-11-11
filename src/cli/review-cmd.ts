@@ -21,6 +21,9 @@ import ReviewSummary from "../ui/review/ReviewSummary.js";
 import { ensureIndexedAndWatching } from "./index-cmd.js";
 import { MossClient } from "../core/indexer/moss-client.js";
 import { MorphApplier } from "../core/review/morph-applier.js";
+import { AppLayout } from "../ui/components/AppLayout.js";
+import { getCurrentModel, getVersion, getCurrentDirectory } from "../ui/components/banner-utils.js";
+import { showConsoleBanner } from "../ui/components/console-banner.js";
 
 let inkModule: any | null = null;
 
@@ -286,6 +289,9 @@ export function createReviewCommand(): Command {
     .option("--similar", "Show similar past issues from memory")
     .option("--fix", "Interactively apply suggested fixes")
     .action(async (files: string[], options) => {
+      // Show banner at the very start
+      await showConsoleBanner();
+
       const reviewStartTime = Date.now();
       const spinner = ora("Initializing review...").start();
 
@@ -494,8 +500,18 @@ export function createReviewCommand(): Command {
 
         if (shouldUseInk) {
           const ink = await getInk();
+          const currentModel = await getCurrentModel();
+          const version = getVersion();
+          const directory = getCurrentDirectory();
+
           const app = ink.render(
-            React.createElement(ReviewSummary, { results, ink })
+            React.createElement(AppLayout, {
+              ink,
+              version,
+              model: currentModel,
+              directory,
+              children: React.createElement(ReviewSummary, { results, ink })
+            })
           );
           await app.waitUntilExit();
         }

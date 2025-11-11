@@ -3,6 +3,8 @@ import React from "react";
 
 import ReviewSummary from "../ui/review/ReviewSummary.js";
 import type { ReviewResults } from "../core/review/issue.js";
+import { AppLayout } from "../ui/components/AppLayout.js";
+import { getCurrentModel, getVersion, getCurrentDirectory } from "../ui/components/banner-utils.js";
 
 let inkModule: any | null = null;
 
@@ -151,10 +153,19 @@ export function registerTestInkCommand(program: Command): void {
 
       const ink = await getInk();
       const results: ReviewResults = buildDummyResults();
+      const currentModel = await getCurrentModel();
+      const version = getVersion();
+      const directory = getCurrentDirectory();
 
       console.log("\nRendering dummy review summary...\n");
       const app = ink.render(
-        React.createElement(ReviewSummary, { results, ink })
+        React.createElement(AppLayout, {
+          ink,
+          version,
+          model: currentModel,
+          directory,
+          children: React.createElement(ReviewSummary, { results, ink })
+        })
       );
       await app.waitUntilExit();
       console.log("\nDone.\n");

@@ -3,6 +3,7 @@ import prompts from "prompts";
 import { getAuthStatus, updateModelPreferences } from "../utils/token-manager.js";
 import { logger } from "../utils/logger.js";
 import chalk from "chalk";
+import { showConsoleBanner } from "../ui/components/console-banner.js";
 
 // Supported models (same as login-cmd.ts)
 const SUPPORTED_MODELS = {
@@ -47,6 +48,8 @@ type ModelKey = keyof typeof SUPPORTED_MODELS;
  * List currently selected models
  */
 async function handleModelsList() {
+  await showConsoleBanner();
+
   try {
     const status = await getAuthStatus();
 
@@ -94,6 +97,8 @@ async function handleModelsList() {
  * Update model selection
  */
 async function handleModelsSelect() {
+  await showConsoleBanner();
+
   try {
     const status = await getAuthStatus();
 
@@ -184,6 +189,8 @@ async function handleModelsSelect() {
  * Show available models
  */
 async function handleModelsAvailable() {
+  await showConsoleBanner();
+
   console.log(chalk.cyan("\nAvailable Models\n"));
 
   const anthropicModels = Object.entries(SUPPORTED_MODELS)

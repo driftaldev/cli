@@ -25,10 +25,15 @@ async function logContextToFile(
   agentName: string,
   context: any
 ): Promise<void> {
+  // Only log context when DRIFTAL_DEBUG=1 is set
+  if (process.env.DRIFTAL_DEBUG !== "1") {
+    return;
+  }
+
   try {
     // Get the working directory (where CLI is run from)
     const workingDir = process.cwd();
-    const scoutCodeDir = path.join(workingDir, ".driftal");
+    const scoutCodeDir = path.join(workingDir, ".driftal", "debug", "logs");
 
     // Ensure .driftal directory exists
     await fs.mkdir(scoutCodeDir, { recursive: true });

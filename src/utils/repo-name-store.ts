@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { logger } from "../utils/logger.js";
+import { ensureDriftalInGitignore } from "./gitignore-manager.js";
 
 const METADATA_FILENAME = "config.json";
 
@@ -48,6 +49,8 @@ async function writeMetadata(
   metadata: ScoutMetadata
 ): Promise<void> {
   const metadataPath = getMetadataPath(repoRoot);
+  // Ensure .driftal is in .gitignore before creating the folder
+  await ensureDriftalInGitignore(repoRoot);
   await fs.mkdir(path.dirname(metadataPath), { recursive: true });
   await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf8");
 }

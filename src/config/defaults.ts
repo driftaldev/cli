@@ -30,7 +30,7 @@ export const DEFAULT_CONFIG: ScoutConfig = {
   },
   indexing: {
     file_extensions: [".ts", ".tsx", ".js", ".jsx", ".py"],
-    exclude_patterns: ["**/node_modules/**", "**/dist/**", "**/.git/**"]
+    exclude_patterns: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/.driftal/**"]
   },
   cloud: {
     enabled: false,

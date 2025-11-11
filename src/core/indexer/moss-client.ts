@@ -9,6 +9,7 @@ import * as fs from "fs/promises";
 import * as crypto from "crypto";
 import { fetchMossCredentials } from "../../utils/moss-credentials.js";
 import { logger } from "../../utils/logger.js";
+import { ensureDriftalInGitignore } from "../../utils/gitignore-manager.js";
 
 export interface IndexFilePayload {
   path: string;
@@ -131,6 +132,15 @@ export class MossClient {
   }
 
   private async ensureIndexDir(): Promise<void> {
+    // Extract repo root (parent of .driftal folder) from indexDir
+    // indexDir is typically something like /path/to/repo/.driftal/indexes
+    const parts = this.indexDir.split(path.sep);
+    const driftalIndex = parts.indexOf(".driftal");
+    if (driftalIndex !== -1) {
+      const repoRoot = parts.slice(0, driftalIndex).join(path.sep) || "/";
+      // Ensure .driftal is in .gitignore before creating the folder
+      await ensureDriftalInGitignore(repoRoot);
+    }
     await fs.mkdir(this.indexDir, { recursive: true });
   }
 

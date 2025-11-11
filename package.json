@@ -1,26 +1,26 @@
 {
-  "name": "scout-code-cli",
-  "version": "0.1.21",
-  "description": "Scout Code CLI and MCP server for blazing-fast context delivery and code review",
+  "name": "driftal",
+  "version": "0.1.0",
+  "description": "Driftal CLI and MCP server for local and blazing-fast code review",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jaymalave/ScoutCodeCLI.git"
+    "url": "git+https://github.com/driftaldev/cli.git"
   },
-  "homepage": "https://github.com/jaymalave/ScoutCodeCLI#readme",
+  "homepage": "https://github.com/driftaldev/cli#readme",
   "bugs": {
-    "url": "https://github.com/jaymalave/ScoutCodeCLI/issues"
+    "url": "https://github.com/driftaldev/cli/issues"
   },
   "keywords": [
     "cli",
     "developer-tools",
     "mcp",
-    "scout"
+    "driftal"
   ],
   "author": "Jay Malave",
   "bin": {
-    "scoutcli": "./dist/index.js"
+    "driftal": "./dist/index.js"
   },
   "files": [
     "dist",

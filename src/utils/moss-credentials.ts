@@ -1,7 +1,8 @@
 import { loadAuthTokens } from "./token-manager.js";
 
 // Default backend URL - can be overridden via env var
-const BACKEND_BASE_URL = process.env.SCOUT_AUTH_URL || "http://localhost:3000";
+const BACKEND_BASE_URL =
+  process.env.SCOUT_AUTH_URL || "https://auth.driftal.dev";
 
 export interface MossCredentials {
   project_id: string;
@@ -71,5 +72,3 @@ export async function fetchMossCredentials(): Promise<MossCredentials> {
     throw new Error("Unknown error while fetching Moss credentials");
   }
 }
-
-

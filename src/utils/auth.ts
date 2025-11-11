@@ -4,9 +4,9 @@ import { AuthTokens, saveAuthTokens, loadAuthTokens } from "./token-manager.js";
 import { logger } from "./logger.js";
 
 // Default auth endpoint - can be overridden via env var
-const AUTH_BASE_URL = process.env.SCOUT_AUTH_URL || "http://localhost:3000";
+const AUTH_BASE_URL = process.env.SCOUT_AUTH_URL || "https://auth.driftal.dev";
 const AUTH_CLI_URL =
-  process.env.SCOUT_CLI_AUTH_URL || "http://localhost:3000/cli/auth";
+  process.env.SCOUT_CLI_AUTH_URL || "https://auth.driftal.dev/cli/auth";
 
 function buildAuthApiUrl(path: string): string {
   return new URL(path, AUTH_BASE_URL).toString();

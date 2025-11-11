@@ -3,12 +3,13 @@ import {
   type LLMMessage,
   type LLMGenerateOptions,
   type LLMGenerateResponse,
-  type LLMStreamChunk
+  type LLMStreamChunk,
 } from "../provider.js";
 import { loadAuthTokens, AuthTokens } from "../../../utils/token-manager.js";
 import { logger } from "../../../utils/logger.js";
 
-const CLOUD_PROXY_URL = process.env.SCOUT_PROXY_URL || "http://localhost:3000/v1";
+const CLOUD_PROXY_URL =
+  process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev/v1";
 
 export interface CloudProxyConfig {
   proxyUrl?: string;
@@ -16,7 +17,7 @@ export interface CloudProxyConfig {
 }
 
 /**
- * Cloud proxy provider that routes LLM requests through Scout's backend
+ * Cloud proxy provider that routes LLM requests through Driftal's backend
  * This eliminates the need for users to manage their own API keys
  */
 export class CloudProxyProvider extends LLMProvider {
@@ -75,11 +76,11 @@ export class CloudProxyProvider extends LLMProvider {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
-          "X-Scout-CLI-Version": "1.0.0" // TODO: get from package.json
+          Authorization: `Bearer ${accessToken}`,
+          "X-Scout-CLI-Version": "1.0.0", // TODO: get from package.json
         },
         body: JSON.stringify(body),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -109,7 +110,6 @@ export class CloudProxyProvider extends LLMProvider {
       }
 
       return response;
-
     } catch (error) {
       clearTimeout(timeoutId);
 
@@ -124,17 +124,23 @@ export class CloudProxyProvider extends LLMProvider {
     }
   }
 
-  override async generate(request: LLMGenerateOptions): Promise<LLMGenerateResponse> {
+  override async generate(
+    request: LLMGenerateOptions
+  ): Promise<LLMGenerateResponse> {
     logger.debug("Sending request to cloud proxy...");
 
     const requestBody = {
       messages: request.messages,
       temperature: request.temperature,
       max_tokens: request.maxTokens,
-      stop_sequences: request.stopSequences
+      stop_sequences: request.stopSequences,
     };
 
-    const response = await this.makeRequest("/v1/chat/completions", requestBody, false);
+    const response = await this.makeRequest(
+      "/v1/chat/completions",
+      requestBody,
+      false
+    );
     const data = await response.json();
 
     // Handle OpenAI-style response format
@@ -144,13 +150,18 @@ export class CloudProxyProvider extends LLMProvider {
 
       return {
         content,
-        stopReason: choice.finish_reason === "stop" ? "end_turn" :
-                   choice.finish_reason === "length" ? "max_tokens" :
-                   "end_turn",
-        usage: data.usage ? {
-          inputTokens: data.usage.prompt_tokens || 0,
-          outputTokens: data.usage.completion_tokens || 0
-        } : undefined
+        stopReason:
+          choice.finish_reason === "stop"
+            ? "end_turn"
+            : choice.finish_reason === "length"
+            ? "max_tokens"
+            : "end_turn",
+        usage: data.usage
+          ? {
+              inputTokens: data.usage.prompt_tokens || 0,
+              outputTokens: data.usage.completion_tokens || 0,
+            }
+          : undefined,
       };
     }
 
@@ -163,17 +174,21 @@ export class CloudProxyProvider extends LLMProvider {
       return {
         content: textContent,
         stopReason: data.stop_reason || "end_turn",
-        usage: data.usage ? {
-          inputTokens: data.usage.input_tokens || 0,
-          outputTokens: data.usage.output_tokens || 0
-        } : undefined
+        usage: data.usage
+          ? {
+              inputTokens: data.usage.input_tokens || 0,
+              outputTokens: data.usage.output_tokens || 0,
+            }
+          : undefined,
       };
     }
 
     throw new Error("Unexpected response format from cloud proxy");
   }
 
-  override async *generateStream(request: LLMGenerateOptions): AsyncGenerator<LLMStreamChunk, void, unknown> {
+  override async *generateStream(
+    request: LLMGenerateOptions
+  ): AsyncGenerator<LLMStreamChunk, void, unknown> {
     logger.debug("Sending streaming request to cloud proxy...");
 
     const requestBody = {
@@ -181,10 +196,14 @@ export class CloudProxyProvider extends LLMProvider {
       temperature: request.temperature,
       max_tokens: request.maxTokens,
       stop_sequences: request.stopSequences,
-      stream: true
+      stream: true,
     };
 
-    const response = await this.makeRequest("/v1/chat/completions", requestBody, true);
+    const response = await this.makeRequest(
+      "/v1/chat/completions",
+      requestBody,
+      true
+    );
 
     if (!response.body) {
       throw new Error("No response body for streaming");
@@ -227,7 +246,7 @@ export class CloudProxyProvider extends LLMProvider {
                 if (delta?.content) {
                   yield {
                     type: "content_delta",
-                    delta: delta.content
+                    delta: delta.content,
                   };
                 }
               }
@@ -237,19 +256,24 @@ export class CloudProxyProvider extends LLMProvider {
                 if (data.delta?.text) {
                   yield {
                     type: "content_delta",
-                    delta: data.delta.text
+                    delta: data.delta.text,
                   };
                 }
               }
 
               // Handle completion
-              if (data.type === "message_stop" || data.choices?.[0]?.finish_reason) {
+              if (
+                data.type === "message_stop" ||
+                data.choices?.[0]?.finish_reason
+              ) {
                 yield {
                   type: "message_stop",
-                  stopReason: data.stop_reason || data.choices?.[0]?.finish_reason || "end_turn"
+                  stopReason:
+                    data.stop_reason ||
+                    data.choices?.[0]?.finish_reason ||
+                    "end_turn",
                 };
               }
-
             } catch (error) {
               logger.warn("Failed to parse streaming chunk:", error);
               continue;
@@ -257,7 +281,6 @@ export class CloudProxyProvider extends LLMProvider {
           }
         }
       }
-
     } finally {
       reader.releaseLock();
     }

@@ -1,7 +1,8 @@
 import { loadAuthTokens } from "./token-manager.js";
 
 // Default backend URL - can be overridden via env var
-const BACKEND_BASE_URL = process.env.SCOUT_AUTH_URL || "http://localhost:3000";
+const BACKEND_BASE_URL =
+  process.env.SCOUT_AUTH_URL || "https://auth.driftal.dev";
 
 export interface MorphCredentials {
   api_key: string;
@@ -70,4 +71,3 @@ export async function fetchMorphCredentials(): Promise<MorphCredentials> {
     throw new Error("Unknown error while fetching Morph credentials");
   }
 }
-

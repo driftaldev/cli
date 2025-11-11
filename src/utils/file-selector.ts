@@ -32,7 +32,7 @@ async function getAllFiles(dir: string, basePath: string = dir): Promise<string[
     "build/**",
     ".next/**",
     "coverage/**",
-    ".scout-code/**"
+    ".driftal/**"
   ]);
 
   async function scan(currentDir: string) {

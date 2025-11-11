@@ -98,7 +98,7 @@ export const CloudConfigSchema = z
   });
 
 export const MossConfigSchema = z.object({
-  index_directory: z.string().default(".scout-code/indexes"),
+  index_directory: z.string().default(".driftal/indexes"),
   project_id: z.string(),
   project_key: z.string()
 });
@@ -159,9 +159,9 @@ export const LLMConfigSchema = z.object({
 export const MastraConfigSchema = z.object({
   memory: z.object({
     enabled: z.boolean().default(true),
-    storageDir: z.string().default('.scout-code/memory'),
+    storageDir: z.string().default('.driftal/memory'),
     vectorDb: z.enum(['local', 'redis']).default('local')
-  }).default({ enabled: true, storageDir: '.scout-code/memory', vectorDb: 'local' }),
+  }).default({ enabled: true, storageDir: '.driftal/memory', vectorDb: 'local' }),
   workflows: z.object({
     parallel: z.boolean().default(true),
     timeout: z.number().int().positive().default(300000) // 5 minutes
@@ -245,7 +245,7 @@ export const HyperspellConfigSchema = z.object({
   apiKey: z.string().optional(),
   apiKeyEnv: z.string().default("HYPERSPELL_API_KEY"),
   localMode: z.boolean().default(true),
-  storageDir: z.string().default(".scout-code/memory")
+  storageDir: z.string().default(".driftal/memory")
 });
 
 export const ScoutConfigSchema = z.object({

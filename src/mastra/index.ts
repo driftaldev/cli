@@ -44,7 +44,7 @@ export class MastraReviewOrchestrator {
     this.config = config;
 
     const memoryEnabled = config.memory?.enabled ?? true;
-    const memoryDir = config.memory?.storageDir ?? '.scout-code/memory';
+    const memoryDir = config.memory?.storageDir ?? '.driftal/memory';
     this.memory = new ReviewMemory(memoryDir, memoryEnabled);
   }
 

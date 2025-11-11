@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
-import crypto from 'crypto';
-import type { ReviewIssue, ReviewResults } from '../../core/review/issue.js';
+import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
+import type { ReviewIssue, ReviewResults } from "../../core/review/issue.js";
 
 export interface ReviewMemoryEntry {
   id: string;
@@ -9,7 +9,7 @@ export interface ReviewMemoryEntry {
   fileName: string;
   fileHash: string;
   issue: ReviewIssue;
-  userFeedback?: 'accepted' | 'rejected' | 'fixed';
+  userFeedback?: "accepted" | "rejected" | "fixed";
   repoPath: string;
 }
 
@@ -31,10 +31,10 @@ export class ReviewMemory {
   private patternsFile: string;
   private enabled: boolean;
 
-  constructor(storageDir: string = '.scout-code/memory', enabled: boolean = true) {
+  constructor(storageDir: string = ".driftal/memory", enabled: boolean = true) {
     this.storageDir = storageDir;
-    this.memoryFile = path.join(storageDir, 'review-memory.json');
-    this.patternsFile = path.join(storageDir, 'learned-patterns.json');
+    this.memoryFile = path.join(storageDir, "review-memory.json");
+    this.patternsFile = path.join(storageDir, "learned-patterns.json");
     this.enabled = enabled;
   }
 
@@ -60,7 +60,7 @@ export class ReviewMemory {
         await fs.writeFile(this.patternsFile, JSON.stringify([], null, 2));
       }
     } catch (error) {
-      console.error('Failed to initialize review memory:', error);
+      console.error("Failed to initialize review memory:", error);
     }
   }
 
@@ -85,7 +85,7 @@ export class ReviewMemory {
           fileName,
           fileHash,
           issue,
-          repoPath
+          repoPath,
         };
 
         memory.push(entry);
@@ -98,7 +98,7 @@ export class ReviewMemory {
 
       await fs.writeFile(this.memoryFile, JSON.stringify(memory, null, 2));
     } catch (error) {
-      console.error('Failed to store review in memory:', error);
+      console.error("Failed to store review in memory:", error);
     }
   }
 
@@ -107,13 +107,13 @@ export class ReviewMemory {
    */
   async recordFeedback(
     issueId: string,
-    feedback: 'accepted' | 'rejected' | 'fixed'
+    feedback: "accepted" | "rejected" | "fixed"
   ): Promise<void> {
     if (!this.enabled) return;
 
     try {
       const memory = await this.loadMemory();
-      const entry = memory.find(e => e.id === issueId);
+      const entry = memory.find((e) => e.id === issueId);
 
       if (entry) {
         entry.userFeedback = feedback;
@@ -123,7 +123,7 @@ export class ReviewMemory {
         await this.updatePatterns(entry);
       }
     } catch (error) {
-      console.error('Failed to record feedback:', error);
+      console.error("Failed to record feedback:", error);
     }
   }
 
@@ -142,7 +142,7 @@ export class ReviewMemory {
 
       // Filter by file name pattern and issue type
       const similar = memory
-        .filter(entry => {
+        .filter((entry) => {
           const sameType = entry.issue.type === issueType;
           const similarFile = this.areSimilarFiles(fileName, entry.fileName);
           return sameType && similarFile;
@@ -152,7 +152,7 @@ export class ReviewMemory {
 
       return similar;
     } catch (error) {
-      console.error('Failed to find similar issues:', error);
+      console.error("Failed to find similar issues:", error);
       return [];
     }
   }
@@ -160,27 +160,30 @@ export class ReviewMemory {
   /**
    * Get acceptance rate for a specific issue pattern
    */
-  async getAcceptanceRate(issueType: string, severity: string): Promise<number> {
+  async getAcceptanceRate(
+    issueType: string,
+    severity: string
+  ): Promise<number> {
     if (!this.enabled) return 0.5;
 
     try {
       const memory = await this.loadMemory();
-      const relevantIssues = memory.filter(e =>
-        e.issue.type === issueType && e.issue.severity === severity
+      const relevantIssues = memory.filter(
+        (e) => e.issue.type === issueType && e.issue.severity === severity
       );
 
       if (relevantIssues.length === 0) return 0.5;
 
-      const withFeedback = relevantIssues.filter(e => e.userFeedback);
+      const withFeedback = relevantIssues.filter((e) => e.userFeedback);
       if (withFeedback.length === 0) return 0.5;
 
-      const accepted = withFeedback.filter(e =>
-        e.userFeedback === 'accepted' || e.userFeedback === 'fixed'
+      const accepted = withFeedback.filter(
+        (e) => e.userFeedback === "accepted" || e.userFeedback === "fixed"
       ).length;
 
       return accepted / withFeedback.length;
     } catch (error) {
-      console.error('Failed to get acceptance rate:', error);
+      console.error("Failed to get acceptance rate:", error);
       return 0.5;
     }
   }
@@ -202,7 +205,7 @@ export class ReviewMemory {
 
       return patterns;
     } catch (error) {
-      console.error('Failed to get learned patterns:', error);
+      console.error("Failed to get learned patterns:", error);
       return [];
     }
   }
@@ -221,15 +224,15 @@ export class ReviewMemory {
         totalReviews: 0,
         withFeedback: 0,
         acceptanceRate: 0,
-        topIssueTypes: []
+        topIssueTypes: [],
       };
     }
 
     try {
       const memory = await this.loadMemory();
-      const withFeedback = memory.filter(e => e.userFeedback);
-      const accepted = withFeedback.filter(e =>
-        e.userFeedback === 'accepted' || e.userFeedback === 'fixed'
+      const withFeedback = memory.filter((e) => e.userFeedback);
+      const accepted = withFeedback.filter(
+        (e) => e.userFeedback === "accepted" || e.userFeedback === "fixed"
       );
 
       // Count issue types
@@ -247,16 +250,17 @@ export class ReviewMemory {
       return {
         totalReviews: memory.length,
         withFeedback: withFeedback.length,
-        acceptanceRate: withFeedback.length > 0 ? accepted.length / withFeedback.length : 0,
-        topIssueTypes
+        acceptanceRate:
+          withFeedback.length > 0 ? accepted.length / withFeedback.length : 0,
+        topIssueTypes,
       };
     } catch (error) {
-      console.error('Failed to get stats:', error);
+      console.error("Failed to get stats:", error);
       return {
         totalReviews: 0,
         withFeedback: 0,
         acceptanceRate: 0,
-        topIssueTypes: []
+        topIssueTypes: [],
       };
     }
   }
@@ -271,7 +275,7 @@ export class ReviewMemory {
       await fs.writeFile(this.memoryFile, JSON.stringify([], null, 2));
       await fs.writeFile(this.patternsFile, JSON.stringify([], null, 2));
     } catch (error) {
-      console.error('Failed to clear memory:', error);
+      console.error("Failed to clear memory:", error);
     }
   }
 
@@ -280,7 +284,7 @@ export class ReviewMemory {
    */
   private async loadMemory(): Promise<ReviewMemoryEntry[]> {
     try {
-      const data = await fs.readFile(this.memoryFile, 'utf-8');
+      const data = await fs.readFile(this.memoryFile, "utf-8");
       return JSON.parse(data);
     } catch {
       return [];
@@ -292,7 +296,7 @@ export class ReviewMemory {
    */
   private async loadPatterns(): Promise<LearningPattern[]> {
     try {
-      const data = await fs.readFile(this.patternsFile, 'utf-8');
+      const data = await fs.readFile(this.patternsFile, "utf-8");
       return JSON.parse(data);
     } catch {
       return [];
@@ -307,7 +311,7 @@ export class ReviewMemory {
       const patterns = await this.loadPatterns();
 
       const pattern = `${entry.issue.type}:${entry.issue.severity}`;
-      let existing = patterns.find(p => p.pattern === pattern);
+      let existing = patterns.find((p) => p.pattern === pattern);
 
       if (!existing) {
         existing = {
@@ -315,7 +319,7 @@ export class ReviewMemory {
           confidence: 0.5,
           occurrences: 0,
           acceptanceRate: 0,
-          lastSeen: Date.now()
+          lastSeen: Date.now(),
         };
         patterns.push(existing);
       }
@@ -325,19 +329,23 @@ export class ReviewMemory {
 
       // Update acceptance rate
       if (entry.userFeedback) {
-        const accepted = entry.userFeedback === 'accepted' || entry.userFeedback === 'fixed';
-        existing.acceptanceRate = (
-          (existing.acceptanceRate * (existing.occurrences - 1) + (accepted ? 1 : 0)) /
-          existing.occurrences
-        );
+        const accepted =
+          entry.userFeedback === "accepted" || entry.userFeedback === "fixed";
+        existing.acceptanceRate =
+          (existing.acceptanceRate * (existing.occurrences - 1) +
+            (accepted ? 1 : 0)) /
+          existing.occurrences;
 
         // Adjust confidence based on acceptance
-        existing.confidence = Math.min(0.95, existing.acceptanceRate * 0.9 + 0.1);
+        existing.confidence = Math.min(
+          0.95,
+          existing.acceptanceRate * 0.9 + 0.1
+        );
       }
 
       await fs.writeFile(this.patternsFile, JSON.stringify(patterns, null, 2));
     } catch (error) {
-      console.error('Failed to update patterns:', error);
+      console.error("Failed to update patterns:", error);
     }
   }
 
@@ -345,7 +353,7 @@ export class ReviewMemory {
    * Hash a file path for comparison
    */
   private hashFile(filePath: string): string {
-    return crypto.createHash('md5').update(filePath).digest('hex');
+    return crypto.createHash("md5").update(filePath).digest("hex");
   }
 
   /**

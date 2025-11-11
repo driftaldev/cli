@@ -24,7 +24,7 @@ export function registerServeCommand(
       const repoRoot = process.cwd();
 
       // Initialize Moss client - try backend first, fallback to config/env
-      const indexDir = config.moss?.index_directory || ".scout-code/indexes";
+      const indexDir = config.moss?.index_directory || ".driftal/indexes";
       let client: MossClient;
       try {
         client = await MossClient.fromBackend(indexDir);

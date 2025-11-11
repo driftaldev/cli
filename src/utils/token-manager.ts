@@ -15,7 +15,7 @@ export interface AuthTokens {
   updatedAt: number;
 }
 
-const AUTH_FILE_NAME = ".scout/auth.json";
+const AUTH_FILE_NAME = ".driftal/auth.json";
 
 /**
  * Get the path to the global auth file in user's home directory
@@ -25,7 +25,7 @@ function getAuthFilePath(): string {
 }
 
 /**
- * Ensure the .scout directory exists in user's home
+ * Ensure the .driftal directory exists in user's home
  */
 async function ensureAuthDirectory(): Promise<void> {
   const authDir = path.dirname(getAuthFilePath());
@@ -37,7 +37,7 @@ async function ensureAuthDirectory(): Promise<void> {
 }
 
 /**
- * Load authentication tokens from ~/.scout/auth.json
+ * Load authentication tokens from ~/.driftal/auth.json
  */
 export async function loadAuthTokens(): Promise<AuthTokens | null> {
   try {
@@ -58,7 +58,7 @@ export async function loadAuthTokens(): Promise<AuthTokens | null> {
 }
 
 /**
- * Save authentication tokens to ~/.scout/auth.json
+ * Save authentication tokens to ~/.driftal/auth.json
  */
 export async function saveAuthTokens(tokens: AuthTokens): Promise<void> {
   await ensureAuthDirectory();

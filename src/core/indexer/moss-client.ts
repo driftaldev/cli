@@ -95,7 +95,7 @@ export class MossClient {
   constructor(
     projectId?: string,
     projectKey?: string,
-    indexDirectory: string = ".scout-code/indexes"
+    indexDirectory: string = ".driftal/indexes"
   ) {
     // Get Moss credentials from: 1) parameters, 2) environment variables
     const id =
@@ -120,7 +120,7 @@ export class MossClient {
    * This is the preferred method for authenticated CLI usage
    */
   static async fromBackend(
-    indexDirectory: string = ".scout-code/indexes"
+    indexDirectory: string = ".driftal/indexes"
   ): Promise<MossClient> {
     const credentials = await fetchMossCredentials();
     return new MossClient(

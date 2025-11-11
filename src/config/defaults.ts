@@ -40,7 +40,7 @@ export const DEFAULT_CONFIG: ScoutConfig = {
     api_key_env: "SCOUT_CLOUD_API_KEY"
   },
   moss: {
-    index_directory: ".scout-code/indexes",
+    index_directory: ".driftal/indexes",
     project_id: EMBEDDED_MOSS_PROJECT_ID,
     project_key: EMBEDDED_MOSS_PROJECT_KEY
   }

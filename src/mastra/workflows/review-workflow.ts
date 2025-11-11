@@ -18,7 +18,7 @@ import { promises as fs } from "fs";
 import path from "path";
 
 /**
- * Utility function to log context to .scout-code folder
+ * Utility function to log context to .driftal folder
  */
 async function logContextToFile(
   filePath: string,
@@ -28,9 +28,9 @@ async function logContextToFile(
   try {
     // Get the working directory (where CLI is run from)
     const workingDir = process.cwd();
-    const scoutCodeDir = path.join(workingDir, ".scout-code");
+    const scoutCodeDir = path.join(workingDir, ".driftal");
 
-    // Ensure .scout-code directory exists
+    // Ensure .driftal directory exists
     await fs.mkdir(scoutCodeDir, { recursive: true });
 
     // Create filename: <filename>_<agentName>_<timestamp>.txt

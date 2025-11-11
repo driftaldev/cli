@@ -9,7 +9,7 @@ const levelPrefix: Record<LogLevel, string> = {
   debug: chalk.magenta("debug"),
 };
 
-const isDebug = () => process.env.SCOUT_DEBUG === "1";
+const isDebug = () => process.env.DRIFTAL_DEBUG === "1";
 
 function logWithPrefix(
   level: LogLevel,

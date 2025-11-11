@@ -142,7 +142,7 @@ function parseEnvFile(contents: string): Record<string, string> {
 function normalizeConfigPath(configPath?: string): string {
   if (!configPath) {
     // Use process.cwd() to get the directory where the user ran the command
-    return path.join(process.cwd(), ".scout", "config.yaml");
+    return path.join(process.cwd(), ".driftal", "config.yaml");
   }
   return path.isAbsolute(configPath)
     ? configPath
@@ -313,7 +313,7 @@ export async function loadConfig(configPath?: string): Promise<ScoutConfig> {
 /**
  * Load LLM configuration with cloud proxy support
  * Priority order:
- * 1. Cloud proxy auth (if tokens exist in ~/.scout/auth.json)
+ * 1. Cloud proxy auth (if tokens exist in ~/.driftal/auth.json)
  * 2. Config file LLM settings
  * 3. Direct API keys from environment variables
  */

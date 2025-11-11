@@ -22,7 +22,7 @@ export class RepoNameNotConfiguredError extends Error {
 
 function getMetadataPath(repoRoot: string): string {
   const resolvedRoot = path.resolve(repoRoot);
-  return path.join(resolvedRoot, ".scout", METADATA_FILENAME);
+  return path.join(resolvedRoot, ".driftal", METADATA_FILENAME);
 }
 
 async function readMetadata(repoRoot: string): Promise<ScoutMetadata> {

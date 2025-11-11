@@ -25,12 +25,12 @@ indexer-service/.venv/
 .idea/
 .DS_Store
 
-# Scout cache and config
+# Driftal cache and config
 a.suo
-.scout/
-.scout/cache.db
-.scout/cache.sqlite
-.scout/tmp/
+.driftal/
+.driftal/cache.db
+.driftal/cache.sqlite
+.driftal/tmp/
 
 # Logs
 logs/

@@ -318,7 +318,7 @@ export function createReviewCommand(): Command {
         spinner.text = "Ensuring codebase is indexed...";
         const repoPath = process.cwd();
 
-        const indexDir = config.moss?.index_directory || ".scout-code/indexes";
+        const indexDir = config.moss?.index_directory || ".driftal/indexes";
         let mossClient: MossClient;
         try {
           mossClient = await MossClient.fromBackend(indexDir);
@@ -361,7 +361,7 @@ export function createReviewCommand(): Command {
           mastra: {
             memory: {
               enabled: options.memory !== false,
-              storageDir: ".scout-code/memory",
+              storageDir: ".driftal/memory",
               vectorDb: "local",
             },
             workflows: {

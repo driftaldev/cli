@@ -25,6 +25,10 @@ indexer-service/.venv/
 .idea/
 .DS_Store
 
+.claude
+
+.tmp
+
 # Driftal cache and config
 a.suo
 .driftal/
@@ -35,3 +39,5 @@ a.suo
 # Logs
 logs/
 *.log
+
+package-lock.json

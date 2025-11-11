@@ -73,22 +73,38 @@ ${context.imports ? JSON.stringify(context.imports, null, 2) : "None"}
 ================================================================================
 TYPE DEFINITIONS (${context.typeDefinitions?.length || 0}):
 ================================================================================
-${context.typeDefinitions ? JSON.stringify(context.typeDefinitions, null, 2) : "None"}
+${
+  context.typeDefinitions
+    ? JSON.stringify(context.typeDefinitions, null, 2)
+    : "None"
+}
 
 ================================================================================
 SIMILAR PATTERNS (${context.similarPatterns?.length || 0}):
 ================================================================================
-${context.similarPatterns ? JSON.stringify(context.similarPatterns, null, 2) : "None"}
+${
+  context.similarPatterns
+    ? JSON.stringify(context.similarPatterns, null, 2)
+    : "None"
+}
 
 ================================================================================
 DEPENDENCIES - UPSTREAM (${context.dependencies?.upstream?.length || 0}):
 ================================================================================
-${context.dependencies?.upstream ? JSON.stringify(context.dependencies.upstream, null, 2) : "None"}
+${
+  context.dependencies?.upstream
+    ? JSON.stringify(context.dependencies.upstream, null, 2)
+    : "None"
+}
 
 ================================================================================
 DEPENDENCIES - DOWNSTREAM (${context.dependencies?.downstream?.length || 0}):
 ================================================================================
-${context.dependencies?.downstream ? JSON.stringify(context.dependencies.downstream, null, 2) : "None"}
+${
+  context.dependencies?.downstream
+    ? JSON.stringify(context.dependencies.downstream, null, 2)
+    : "None"
+}
 
 ================================================================================
 RELATED TESTS (${context.relatedTests?.length || 0}):

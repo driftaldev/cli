@@ -1,9 +1,11 @@
-import { Agent } from '@mastra/core';
-import type { AgentModelConfig } from '../types.js';
-import { codeAnalysisTools } from '../tools/code-analysis-tools.js';
-import { logger } from '../../utils/logger.js';
-import type { EnrichedContext } from '../../core/review/context-strategies.js';
-import { LogicContextStrategy } from '../../core/review/context-strategies.js';
+import { Agent } from "@mastra/core";
+import type { AgentModelConfig } from "../types.js";
+import { codeAnalysisTools } from "../tools/code-analysis-tools.js";
+import { logger } from "../../utils/logger.js";
+import type { EnrichedContext } from "../../core/review/context-strategies.js";
+import { LogicContextStrategy } from "../../core/review/context-strategies.js";
+import type { Stack } from "@/core/indexer/stack-detector.js";
+import { getStackSpecificInstructions } from "./stack-prompts.js";
 
 const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
 
@@ -117,10 +119,23 @@ Output ONLY valid JSON in this format:
 /**
  * Create logic analyzer agent
  */
-export function createLogicAgent(modelConfig: AgentModelConfig) {
+export function createLogicAgent(
+  modelConfig: AgentModelConfig,
+  stacks?: Stack[]
+) {
+  // Build instructions with stack-specific additions
+  let instructions = LOGIC_ANALYZER_INSTRUCTIONS;
+
+  if (stacks && stacks.length > 0) {
+    const stackSpecific = getStackSpecificInstructions("logic", stacks);
+    if (stackSpecific) {
+      instructions = instructions + stackSpecific;
+    }
+  }
+
   return new Agent({
-    name: 'logic-analyzer',
-    instructions: LOGIC_ANALYZER_INSTRUCTIONS,
+    name: "logic-analyzer",
+    instructions,
     model: modelConfig,
     tools: {
       analyzeComplexity: codeAnalysisTools.analyzeComplexity,
@@ -133,10 +148,12 @@ export function createLogicAgent(modelConfig: AgentModelConfig) {
  */
 export async function runLogicAnalysisWithContext(
   agent: Agent,
-  context: EnrichedContext | { changedCode: string; fileName: string; language: string }
+  context:
+    | EnrichedContext
+    | { changedCode: string; fileName: string; language: string }
 ): Promise<any[]> {
   // Check if this is enriched context
-  const isEnriched = 'imports' in context || 'relatedTests' in context;
+  const isEnriched = "imports" in context || "relatedTests" in context;
 
   let prompt: string;
 
@@ -144,7 +161,9 @@ export async function runLogicAnalysisWithContext(
     // Use the logic strategy to format the enriched context
     const strategy = new LogicContextStrategy();
     prompt = strategy.formatPrompt(context as EnrichedContext);
-    logger.debug(`[Logic Agent] Using ENRICHED context for ${context.fileName}`);
+    logger.debug(
+      `[Logic Agent] Using ENRICHED context for ${context.fileName}`
+    );
   } else {
     // Fallback to basic prompt
     prompt = `Analyze the following code for logic bugs and edge cases:
@@ -193,19 +212,21 @@ Return ONLY valid JSON with your findings.`;
   // Log the full prompt being sent to LLM
   logger.debug(`[Logic Agent] ========== FULL PROMPT TO LLM ==========`);
   logger.debug(prompt);
-  logger.debug(`[Logic Agent] ========== END PROMPT (${prompt.length} chars) ==========`);
+  logger.debug(
+    `[Logic Agent] ========== END PROMPT (${prompt.length} chars) ==========`
+  );
 
   try {
     const result = await agent.generate(prompt, {
-      maxSteps: 3 // Allow tool use
+      maxSteps: 3, // Allow tool use
     });
 
-    logger.debug('[Logic Agent] Raw LLM response:', result.text);
+    logger.debug("[Logic Agent] Raw LLM response:", result.text);
 
     // Parse the JSON response
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      logger.debug('[Logic Agent] Extracted JSON:', jsonMatch[0]);
+      logger.debug("[Logic Agent] Extracted JSON:", jsonMatch[0]);
       const parsed = JSON.parse(jsonMatch[0]);
       const issues = parsed.issues || [];
 
@@ -213,20 +234,20 @@ Return ONLY valid JSON with your findings.`;
       const normalizedIssues = issues.map((issue: any) => ({
         ...issue,
         confidence: issue.confidence ?? 0.8, // Default confidence if not provided
-        type: issue.type || 'bug',
-        severity: issue.severity || 'medium',
-        tags: issue.tags || []
+        type: issue.type || "bug",
+        severity: issue.severity || "medium",
+        tags: issue.tags || [],
       }));
 
-      logger.debug('[Logic Agent] Parsed issues:', normalizedIssues);
+      logger.debug("[Logic Agent] Parsed issues:", normalizedIssues);
       return normalizedIssues;
     }
 
-    logger.debug('[Logic Agent] No JSON found in response');
+    logger.debug("[Logic Agent] No JSON found in response");
     return [];
   } catch (error) {
-    console.error('Logic analysis failed:', error);
-    logger.debug('[Logic Agent] Error details:', error);
+    console.error("Logic analysis failed:", error);
+    logger.debug("[Logic Agent] Error details:", error);
     return [];
   }
 }

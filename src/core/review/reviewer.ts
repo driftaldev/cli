@@ -6,6 +6,7 @@ import { ChangeAnalyzer } from "./change-analyzer.js";
 import { MastraReviewOrchestrator, createMastraOrchestrator } from "../../mastra/index.js";
 import { ContextEnricher } from "./context-enricher.js";
 import { loadSavedRepoName } from "../../utils/repo-name-store.js";
+import { detectStacks } from "../indexer/stack-detector.js";
 
 export interface ReviewOptions {
   severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -37,9 +38,14 @@ export class CodeReviewer {
     if (this.mastraInitialized) return;
 
     try {
+      // Detect stacks in the current repository
+      const repoPath = process.cwd();
+      const stacks = await detectStacks(repoPath);
+
       this.mastraOrchestrator = await createMastraOrchestrator({
         llmConfig: this.llmConfig,
-        memory: this.reviewConfig.mastra?.memory
+        memory: this.reviewConfig.mastra?.memory,
+        stacks
       });
       this.mastraInitialized = true;
     } catch (error) {

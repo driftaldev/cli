@@ -4,7 +4,11 @@ import YAML from "yaml";
 
 import { loadAuthTokens } from "../utils/token-manager.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
-import { ScoutConfigSchema, type ScoutConfig, type LLMConfig } from "./schema.js";
+import {
+  ScoutConfigSchema,
+  type ScoutConfig,
+  type LLMConfig,
+} from "./schema.js";
 
 // Re-export types for convenience
 export type { ScoutConfig, LLMConfig };
@@ -160,7 +164,7 @@ export async function loadConfig(configPath?: string): Promise<ScoutConfig> {
   if (!configPath) {
     const overrideCandidates = [
       path.join(process.cwd(), "scout.yaml"),
-      path.join(path.dirname(resolvedConfigPath), "scout.yaml")
+      path.join(path.dirname(resolvedConfigPath), "scout.yaml"),
     ];
     const seen = new Set<string>();
     for (const candidate of overrideCandidates) {
@@ -284,7 +288,7 @@ export async function loadConfig(configPath?: string): Promise<ScoutConfig> {
     if (resolvedApiKey) {
       parsed.cloud = {
         ...cloudConfig,
-        api_key: resolvedApiKey
+        api_key: resolvedApiKey,
       };
     }
 
@@ -292,13 +296,13 @@ export async function loadConfig(configPath?: string): Promise<ScoutConfig> {
       parsed.indexer_service = {
         ...parsed.indexer_service,
         url: cloudIndexerUrl,
-        auto_start: false
+        auto_start: false,
       };
     }
     if (cloudRedisUrl) {
       parsed.cache = {
         ...parsed.cache,
-        redis_url: cloudRedisUrl
+        redis_url: cloudRedisUrl,
       };
     }
   }
@@ -313,7 +317,9 @@ export async function loadConfig(configPath?: string): Promise<ScoutConfig> {
  * 2. Config file LLM settings
  * 3. Direct API keys from environment variables
  */
-export async function loadLLMConfig(baseConfig?: Partial<LLMConfig>): Promise<LLMConfig> {
+export async function loadLLMConfig(
+  baseConfig?: Partial<LLMConfig>
+): Promise<LLMConfig> {
   // Check for cloud authentication tokens
   const authTokens = await loadAuthTokens();
 
@@ -326,13 +332,13 @@ export async function loadLLMConfig(baseConfig?: Partial<LLMConfig>): Promise<LL
           enabled: true,
           accessToken: authTokens.accessToken,
           refreshToken: authTokens.refreshToken,
-          selectedModels: authTokens.selectedModels
-        }
+          selectedModels: authTokens.selectedModels,
+        },
       },
       rateLimits: baseConfig?.rateLimits || {
         requestsPerMinute: 50,
-        tokensPerMinute: 100000
-      }
+        tokensPerMinute: 100000,
+      },
     };
   }
 
@@ -357,22 +363,22 @@ export async function loadLLMConfig(baseConfig?: Partial<LLMConfig>): Promise<LL
             apiKey: anthropicKey,
             apiKeyEnv: "ANTHROPIC_API_KEY",
             model: "claude-3-5-sonnet-20241022",
-            maxTokens: 8192
-          }
+            maxTokens: 8192,
+          },
         }),
         ...(openaiKey && {
           openai: {
             apiKey: openaiKey,
             apiKeyEnv: "OPENAI_API_KEY",
             model: "gpt-4-turbo",
-            maxTokens: 4096
-          }
-        })
+            maxTokens: 4096,
+          },
+        }),
       },
       rateLimits: {
         requestsPerMinute: 50,
-        tokensPerMinute: 100000
-      }
+        tokensPerMinute: 100000,
+      },
     };
   }
 

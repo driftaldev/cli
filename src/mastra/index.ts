@@ -8,6 +8,7 @@ import { codeAnalysisTools } from './tools/code-analysis-tools.js';
 import { gitTools } from './tools/git-tools.js';
 import { loadAuthTokens } from '../utils/token-manager.js';
 import type { AgentModelConfig } from './types.js';
+import type { Stack } from '../core/indexer/stack-detector.js';
 import packageJson from '../../package.json' assert { type: 'json' };
 
 const DEFAULT_PROXY_URL = process.env.SCOUT_PROXY_URL || 'http://localhost:3000/v1';
@@ -19,6 +20,7 @@ export interface MastraConfig {
     enabled?: boolean;
     storageDir?: string;
   };
+  stacks?: Stack[];
 }
 
 /**
@@ -58,10 +60,13 @@ export class MastraReviewOrchestrator {
     // Resolve model configuration for agents
     this.modelConfig = await this.resolveAgentModelConfig();
 
-    // Create agents
-    this.securityAgent = createSecurityAgent(this.modelConfig);
-    this.performanceAgent = createPerformanceAgent(this.modelConfig);
-    this.logicAgent = createLogicAgent(this.modelConfig);
+    // Get stacks from config
+    const stacks = this.config.stacks;
+
+    // Create agents with stack-specific prompts
+    this.securityAgent = createSecurityAgent(this.modelConfig, stacks);
+    this.performanceAgent = createPerformanceAgent(this.modelConfig, stacks);
+    this.logicAgent = createLogicAgent(this.modelConfig, stacks);
 
     // Create workflow
     this.reviewWorkflow = createReviewWorkflow();

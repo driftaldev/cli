@@ -4,6 +4,8 @@ import { codeAnalysisTools } from '../tools/code-analysis-tools.js';
 import { logger } from '../../utils/logger.js';
 import type { EnrichedContext } from '../../core/review/context-strategies.js';
 import { PerformanceContextStrategy } from '../../core/review/context-strategies.js';
+import type { Stack } from '@/core/indexer/stack-detector.js';
+import { getStackSpecificInstructions } from './stack-prompts.js';
 
 const PERFORMANCE_ANALYZER_INSTRUCTIONS = `You are a performance optimization expert with deep contextual understanding.
 
@@ -109,10 +111,23 @@ Output ONLY valid JSON in this format:
 /**
  * Create performance analyzer agent
  */
-export function createPerformanceAgent(modelConfig: AgentModelConfig) {
+export function createPerformanceAgent(
+  modelConfig: AgentModelConfig,
+  stacks?: Stack[]
+) {
+  // Build instructions with stack-specific additions
+  let instructions = PERFORMANCE_ANALYZER_INSTRUCTIONS;
+
+  if (stacks && stacks.length > 0) {
+    const stackSpecific = getStackSpecificInstructions('performance', stacks);
+    if (stackSpecific) {
+      instructions = instructions + stackSpecific;
+    }
+  }
+
   return new Agent({
     name: 'performance-analyzer',
-    instructions: PERFORMANCE_ANALYZER_INSTRUCTIONS,
+    instructions,
     model: modelConfig,
     tools: {
       analyzeComplexity: codeAnalysisTools.analyzeComplexity,

@@ -4,6 +4,8 @@ import { codeAnalysisTools } from '../tools/code-analysis-tools.js';
 import { logger } from '../../utils/logger.js';
 import type { EnrichedContext } from '../../core/review/context-strategies.js';
 import { SecurityContextStrategy } from '../../core/review/context-strategies.js';
+import type { Stack } from '@/core/indexer/stack-detector.js';
+import { getStackSpecificInstructions } from './stack-prompts.js';
 
 const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
@@ -120,10 +122,23 @@ Output ONLY valid JSON in this format:
 /**
  * Create security analyzer agent
  */
-export function createSecurityAgent(modelConfig: AgentModelConfig) {
+export function createSecurityAgent(
+  modelConfig: AgentModelConfig,
+  stacks?: Stack[]
+) {
+  // Build instructions with stack-specific additions
+  let instructions = SECURITY_ANALYZER_INSTRUCTIONS;
+
+  if (stacks && stacks.length > 0) {
+    const stackSpecific = getStackSpecificInstructions('security', stacks);
+    if (stackSpecific) {
+      instructions = instructions + stackSpecific;
+    }
+  }
+
   return new Agent({
     name: 'security-analyzer',
-    instructions: SECURITY_ANALYZER_INSTRUCTIONS,
+    instructions,
     model: modelConfig,
     tools: {
       detectVulnerabilities: codeAnalysisTools.detectVulnerabilities,

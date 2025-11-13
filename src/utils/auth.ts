@@ -160,6 +160,10 @@ async function startCallbackServer(state: string): Promise<{
           userEmail: tokenData.user_email,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          selectedModels: {
+            primary: "gpt-4-turbo",
+            fallback: "gpt-4",
+          },
         };
 
         // Success response

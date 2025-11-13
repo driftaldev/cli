@@ -1,5 +1,6 @@
 import inquirer from "inquirer";
 import inquirerSearchList from "inquirer-search-list";
+import prompts from "prompts";
 import fs from "fs/promises";
 import path from "path";
 import ignore from "ignore";
@@ -149,6 +150,7 @@ function fuzzyFilter(files: string[], query: string = ""): string[] {
 /**
  * Show an interactive file selector with real-time fuzzy search
  * Supports @ prefix for selecting files
+ * Now supports multi-select with checkbox interface
  */
 export async function selectFiles(
   repoPath: string,
@@ -162,63 +164,45 @@ export async function selectFiles(
   }
 
   console.log(`\n📁 Found ${allFiles.length} files in repository`);
-  console.log("💡 Type to search in real-time (e.g., 'rvcmd' matches 'src/cli/review-cmd.ts')\n");
+  console.log("💡 Type to search with fuzzy matching (e.g., 'rvcmd' matches 'src/cli/review-cmd.ts')");
+  console.log("💡 Use SPACE to toggle selection, ENTER to confirm all selected files\n");
 
-  const selectedFiles: string[] = [];
-  let continueSelecting = true;
+  // Use prompts autocompleteMultiselect for multi-select with fuzzy search
+  const response = await prompts({
+    type: "autocompleteMultiselect",
+    name: "files",
+    message: message,
+    choices: allFiles.map(file => ({ title: file, value: file })),
+    suggest: async (input: string, choices: any[]) => {
+      if (!input) return choices;
 
-  while (continueSelecting) {
-    const remainingFiles = allFiles.filter(file => !selectedFiles.includes(file));
+      // Use our custom fuzzy filter to get matching files
+      const matchedFiles = fuzzyFilter(
+        choices.map(c => c.value),
+        input
+      );
 
-    if (remainingFiles.length === 0) {
-      console.log("\n✓ All files selected!");
-      break;
-    }
+      // Return choices in the fuzzy-matched order
+      return choices.filter(c => matchedFiles.includes(c.value))
+        .sort((a, b) => {
+          const aIndex = matchedFiles.indexOf(a.value);
+          const bIndex = matchedFiles.indexOf(b.value);
+          return aIndex - bIndex;
+        });
+    },
+    min: 1,
+    hint: "- Space to select. Return to submit"
+  });
 
-    // Show real-time search list with fuzzy filtering
-    const answer = await inquirer.prompt([
-      {
-        type: "search-list",
-        name: "file",
-        message: selectedFiles.length > 0
-          ? `${message} (${selectedFiles.length} selected, type to search or "done" to finish)`
-          : `${message} (type to search)`,
-        choices: [
-          ...(selectedFiles.length > 0 ? [
-            { name: "✓ Done (finish selection)", value: "__done__" },
-            new inquirer.Separator("─────────────────────────────")
-          ] : []),
-          ...remainingFiles.map(file => ({ name: file, value: file }))
-        ]
-      }
-    ]);
-
-    if (answer.file === "__done__") {
-      continueSelecting = false;
-    } else if (answer.file) {
-      selectedFiles.push(answer.file);
-      console.log(`  ✓ Added: ${answer.file}`);
-
-      // Ask if user wants to continue
-      const continueAnswer = await inquirer.prompt([
-        {
-          type: "confirm",
-          name: "continue",
-          message: "Select another file?",
-          default: true
-        }
-      ]);
-
-      continueSelecting = continueAnswer.continue;
-    }
-  }
-
-  if (selectedFiles.length === 0) {
+  // Handle user cancellation (Ctrl+C)
+  if (!response.files || response.files.length === 0) {
     throw new Error("No files selected");
   }
 
+  const selectedFiles = response.files;
+
   console.log(`\n✓ Selected ${selectedFiles.length} file(s):\n`);
-  selectedFiles.forEach(file => console.log(`  - ${file}`));
+  selectedFiles.forEach((file: string) => console.log(`  - ${file}`));
   console.log("");
 
   return selectedFiles;

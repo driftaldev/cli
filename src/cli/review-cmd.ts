@@ -399,7 +399,7 @@ export function createReviewCommand(): Command {
           spinner.stop();
           selectedFiles = await selectFiles(
             repoPath,
-            "Select files to review (space to select, enter to confirm)"
+            "Select files to review (space to toggle, enter to confirm all)"
           );
           spinner.start("Analyzing changes...");
         } else if (files.length > 0) {

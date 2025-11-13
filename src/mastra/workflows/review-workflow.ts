@@ -224,34 +224,36 @@ export const gatherContextStep = createStep({
       );
       const enrichStartTime = Date.now();
 
-      for (let i = 0; i < reviewableFiles.length; i++) {
-        const file = reviewableFiles[i];
-        try {
-          logger.debug(
-            `[Workflow:GatherContext] Enriching ${i + 1}/${
-              reviewableFiles.length
-            }: ${file.path}`
-          );
-          const changedCode = extractChangedCode(file);
-          const fullFilePath = `${repoPath}/${file.path}`;
+      // Parallelize context enrichment for all files
+      await Promise.all(
+        reviewableFiles.map(async (file, i) => {
+          try {
+            logger.debug(
+              `[Workflow:GatherContext] Enriching ${i + 1}/${
+                reviewableFiles.length
+              }: ${file.path}`
+            );
+            const changedCode = extractChangedCode(file);
+            const fullFilePath = `${repoPath}/${file.path}`;
 
-          const enrichedContext = await contextEnricher.enrich({
-            fileName: file.path,
-            changedCode,
-            language: file.language || "typescript",
-            fullFilePath,
-          });
+            const enrichedContext = await contextEnricher.enrich({
+              fileName: file.path,
+              changedCode,
+              language: file.language || "typescript",
+              fullFilePath,
+            });
 
-          enrichedContexts[file.path] = enrichedContext;
-          logger.debug(`[Workflow:GatherContext] ✓ Enriched ${file.path}`);
-        } catch (error) {
-          logger.warn(
-            `[Workflow:GatherContext] ✗ Failed to enrich ${file.path}:`,
-            error
-          );
-          // Continue with other files
-        }
-      }
+            enrichedContexts[file.path] = enrichedContext;
+            logger.debug(`[Workflow:GatherContext] ✓ Enriched ${file.path}`);
+          } catch (error) {
+            logger.warn(
+              `[Workflow:GatherContext] ✗ Failed to enrich ${file.path}:`,
+              error
+            );
+            // Continue with other files
+          }
+        })
+      );
 
       const enrichDuration = Date.now() - enrichStartTime;
       logger.info(
@@ -304,68 +306,78 @@ export const runAllAgentsInParallelStep = createStep({
       onProgress,
     } = inputData;
 
-    // Helper function to run an agent on all files
+    // Helper function to run an agent on all files in parallel
     const runAgentOnFiles = async (
       agent: any,
       agentName: string,
       strategyType: "security" | "performance" | "logic",
       analysisFn: (agent: any, context: any) => Promise<ReviewIssue[]>
     ): Promise<ReviewIssue[]> => {
-      const issues: ReviewIssue[] = [];
       const ranker = new RelevanceRanker();
       const strategy = ContextStrategyFactory.getStrategy(strategyType);
 
-      for (let i = 0; i < reviewableFiles.length; i++) {
-        const file = reviewableFiles[i];
+      // Process all files in parallel
+      const allIssues = await Promise.all(
+        reviewableFiles.map(async (file, i) => {
+          if (onProgress) {
+            // Update progress with agent name prefix to show parallel execution
+            onProgress(
+              i + 1,
+              reviewableFiles.length,
+              `${agentName}:${file.path}`
+            );
+          }
 
-        if (onProgress) {
-          // Update progress with agent name prefix to show parallel execution
-          onProgress(
-            i + 1,
-            reviewableFiles.length,
-            `${agentName}:${file.path}`
-          );
-        }
+          const changedCode = extractChangedCode(file);
+          if (!changedCode) return [];
 
-        const changedCode = extractChangedCode(file);
-        if (!changedCode) continue;
+          // Get enriched context if available
+          let context: any;
+          if (enrichedContexts && enrichedContexts[file.path]) {
+            const fullContext = enrichedContexts[file.path];
+            logger.debug(
+              `[${agentName}:${file.path}] Full context: ` +
+                `${fullContext.imports?.length || 0} imports, ` +
+                `${fullContext.typeDefinitions?.length || 0} types, ` +
+                `${fullContext.similarPatterns?.length || 0} patterns`
+            );
+            context = strategy.selectContext(fullContext, ranker);
+            logger.debug(
+              `[${agentName}:${file.path}] Selected context: ` +
+                `${context.imports?.length || 0} imports, ` +
+                `${context.typeDefinitions?.length || 0} types, ` +
+                `${context.similarPatterns?.length || 0} patterns`
+            );
+          } else {
+            logger.debug(
+              `[${agentName}:${file.path}] No enriched context, using basic context`
+            );
+            context = {
+              changedCode,
+              fileName: file.path,
+              language: file.language,
+            };
+          }
 
-        // Get enriched context if available
-        let context: any;
-        if (enrichedContexts && enrichedContexts[file.path]) {
-          const fullContext = enrichedContexts[file.path];
-          logger.debug(
-            `[${agentName}:${file.path}] Full context: ` +
-              `${fullContext.imports?.length || 0} imports, ` +
-              `${fullContext.typeDefinitions?.length || 0} types, ` +
-              `${fullContext.similarPatterns?.length || 0} patterns`
-          );
-          context = strategy.selectContext(fullContext, ranker);
-          logger.debug(
-            `[${agentName}:${file.path}] Selected context: ` +
-              `${context.imports?.length || 0} imports, ` +
-              `${context.typeDefinitions?.length || 0} types, ` +
-              `${context.similarPatterns?.length || 0} patterns`
-          );
-        } else {
-          logger.debug(
-            `[${agentName}:${file.path}] No enriched context, using basic context`
-          );
-          context = {
-            changedCode,
-            fileName: file.path,
-            language: file.language,
-          };
-        }
+          // Log the context being passed to the agent
+          await logContextToFile(file.path, agentName, context);
 
-        // Log the context being passed to the agent
-        await logContextToFile(file.path, agentName, context);
+          // Run the agent-specific analysis function
+          try {
+            const fileIssues = await analysisFn(agent, context);
+            return fileIssues;
+          } catch (error) {
+            logger.warn(
+              `[${agentName}:${file.path}] Analysis failed:`,
+              error
+            );
+            return [];
+          }
+        })
+      );
 
-        // Run the agent-specific analysis function
-        const fileIssues = await analysisFn(agent, context);
-
-        issues.push(...fileIssues);
-      }
+      // Flatten the array of issue arrays
+      const issues = allIssues.flat();
 
       logger.debug(
         `[Workflow] ${agentName} agent found ${issues.length} issues`

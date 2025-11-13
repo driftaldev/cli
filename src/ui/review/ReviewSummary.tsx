@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import type { ReviewResults, ReviewIssue, IssueSeverity } from "../../core/review/issue.js";
 import { IssueRanker } from "../../core/review/issue.js";
+import { generateUnifiedDiff } from "../../core/review/utils/diff-generator.js";
 
 type InkModule = typeof import("ink");
 
@@ -101,16 +102,31 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, dura
               typeof issue.suggestion !== "string" && issue.suggestion
                 ? issue.suggestion
                 : undefined;
-            const diffContent = suggestion
-              ? suggestion.diff?.trim() && suggestion.diff.trim().length > 0
-                ? suggestion.diff.trim()
-                : suggestion.code
-                ? suggestion.code
-                    .split("\n")
-                    .map((line) => `+ ${line}`)
-                    .join("\n")
-                : undefined
-              : undefined;
+
+            let diffContent: string | undefined;
+
+            if (suggestion) {
+              // Priority 1: Check if we have originalCode and fixedCode to generate a diff
+              if (suggestion.originalCode && suggestion.fixedCode) {
+                const generatedDiff = generateUnifiedDiff(
+                  suggestion.originalCode,
+                  suggestion.fixedCode,
+                  3
+                );
+                diffContent = generatedDiff || undefined;
+              }
+              // Priority 2: Use pre-generated diff if available
+              else if (suggestion.diff?.trim() && suggestion.diff.trim().length > 0) {
+                diffContent = suggestion.diff.trim();
+              }
+              // Priority 3: Fallback to simple additions from code field
+              else if (suggestion.code) {
+                diffContent = suggestion.code
+                  .split("\n")
+                  .map((line) => `+ ${line}`)
+                  .join("\n");
+              }
+            }
 
             return (
               <Box

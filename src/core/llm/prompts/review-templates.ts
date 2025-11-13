@@ -54,7 +54,9 @@ export function buildReviewPrompt(context: ReviewContext): string {
     },
     "suggestion": {
       "description": "How to fix",
-      "code": "Fixed code snippet with 3-5 lines of surrounding context. Use '// ... existing code ...' markers to show context before and after the fix. Example:\\nfunction example() {\\n  // ... existing code ...\\n  const fixed = 'corrected code here';\\n  // ... existing code ...\\n}"
+      "originalCode": "(Optional) The original code that needs to be changed (for modifications). Include 3-5 lines of context.",
+      "fixedCode": "(Optional) The fixed version of the original code (for modifications). Include 3-5 lines of context.",
+      "code": "(Optional) New code to add (for additions only). Use when adding entirely new code, not modifying existing code."
     },
     "rationale": "Why this is an issue",
     "tags": ["tag1", "tag2"]
@@ -62,7 +64,20 @@ export function buildReviewPrompt(context: ReviewContext): string {
 ]
 \`\`\`
 
-IMPORTANT: For the "suggestion.code" field, include 3-5 lines of surrounding context from the original code before and after your fix. Use comment markers like "// ... existing code ..." to indicate unchanged context. This helps with accurate semantic matching when applying the fix.
+IMPORTANT SUGGESTION GUIDELINES:
+- If fixing an issue requires MODIFYING existing code, provide both "originalCode" and "fixedCode" fields. This will generate a git-style diff showing what changes.
+- If fixing an issue requires ADDING new code (not changing existing lines), provide only the "code" field.
+- For both formats, include 3-5 lines of surrounding context to help with accurate code matching.
+- The "originalCode" should be the exact code from the file that needs to be changed.
+- The "fixedCode" should be the corrected version with the same context lines.
+
+Examples:
+1. For modifications (use originalCode + fixedCode):
+   "originalCode": "function validate(data) {\\n  if (data) {\\n    return true;\\n  }\\n}",
+   "fixedCode": "function validate(data) {\\n  if (data && typeof data === 'object') {\\n    return true;\\n  }\\n}"
+
+2. For additions (use code only):
+   "code": "// Add input validation\\nif (!user || !user.id) {\\n  throw new Error('Invalid user');\\n}"
 
 Focus on real issues that could cause bugs, security problems, or performance issues. Avoid nitpicking about style unless it significantly impacts readability.`;
 

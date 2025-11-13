@@ -95,7 +95,9 @@ For each security issue found, provide:
 - Description: Detailed explanation including context from imports/types if relevant
 - Location: file, line number, column (optional), endLine (optional)
 - CWE ID: If applicable (e.g., CWE-89, CWE-79, CWE-352)
-- Suggestion: Object with description and code (the actual fixed code)
+- Suggestion: Object with description and EITHER:
+  - For MODIFICATIONS: "originalCode" (the vulnerable code) and "fixedCode" (the secure code) - this generates a git-style diff
+  - For ADDITIONS: "code" (new secure code to add) - when adding security measures like validation
 - Rationale: Why this is a security concern, referencing context if applicable
 - Confidence: 0.0 to 1.0
 
@@ -104,20 +106,24 @@ Output ONLY valid JSON in this format:
   "issues": [
     {
       "type": "security",
-      "severity": "critical",
-      "title": "SQL Injection via unsanitized user input",
-      "description": "User input from request parameters is directly concatenated into SQL query. Per IMPORTS, this code uses raw database queries without parameterization",
-      "location": { "file": "api/users.ts", "line": 42, "column": 10, "endLine": 44 },
-      "cwe": "CWE-89",
+      "severity": "critical" | "high" | "medium" | "low",
+      "title": "Brief description",
+      "description": "Detailed explanation",
+      "location": { "file": "path/to/file.ts", "line": 42 },
+      "cwe": "CWE-XXX",
       "suggestion": {
-        "description": "Use parameterized queries to prevent SQL injection",
-        "code": "const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);"
+        "description": "How to fix the vulnerability",
+        "originalCode": "(For modifications) The vulnerable code with 3-5 lines of context",
+        "fixedCode": "(For modifications) The secure version with 3-5 lines of context",
+        "code": "(For additions) New secure code to add - use this when adding validation/sanitization"
       },
-      "rationale": "Per IMPORTS section, db.query() accepts parameterized queries but this code concatenates user input directly. This allows attackers to inject arbitrary SQL: e.g., userId = '1 OR 1=1 --' would expose all users",
-      "confidence": 0.98
+      "rationale": "Why this is a security concern",
+      "confidence": 0.0-1.0
     }
   ]
-}`;
+}
+
+IMPORTANT: Use originalCode + fixedCode when MODIFYING vulnerable code. Use code when ADDING new security measures.`;
 
 /**
  * Create security analyzer agent

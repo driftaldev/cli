@@ -20,6 +20,8 @@ export interface ReviewIssue {
     description: string;
     diff?: string;
     code?: string;
+    originalCode?: string;
+    fixedCode?: string;
   };
   rationale: string;
   references?: string[];

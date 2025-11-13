@@ -81,7 +81,9 @@ For each performance issue found, provide:
 - Location: file, line number, column (optional), endLine (optional)
 - Complexity: Time/space complexity (e.g., "O(n²)")
 - Impact: Estimated impact (high/medium/low)
-- Suggestion: Object with description and code (the optimized code)
+- Suggestion: Object with description and EITHER:
+  - For MODIFICATIONS: "originalCode" (the slow code) and "fixedCode" (the optimized code) - this generates a git-style diff
+  - For ADDITIONS: "code" (new optimized code to add) - when adding caching or optimization utilities
 - Alternative: Better approach or algorithm
 - Rationale: Why this is a performance concern, referencing context if applicable
 - Confidence: 0.0 to 1.0
@@ -91,22 +93,26 @@ Output ONLY valid JSON in this format:
   "issues": [
     {
       "type": "performance",
-      "severity": "high",
-      "title": "Sequential async operations in loop",
-      "description": "Using await inside a loop causes operations to run sequentially. Per IMPORTS, loadAccount() is an async network call that could be parallelized",
-      "location": { "file": "hooks/use-accounts.ts", "line": 45, "column": 5, "endLine": 48 },
-      "complexity": "O(n) network requests executed sequentially",
-      "impact": "high",
+      "severity": "high" | "medium" | "low",
+      "title": "Brief description of the issue",
+      "description": "Detailed explanation including context from imports if relevant",
+      "location": { "file": "path/to/file.ts", "line": 45 },
+      "complexity": "Time/space complexity (e.g., O(n²))",
+      "impact": "high" | "medium" | "low",
       "suggestion": {
-        "description": "Use Promise.all to execute network calls in parallel",
-        "code": "const accounts = await Promise.all(addresses.map(addr => horizonServer.loadAccount(addr)));"
+        "description": "How to optimize",
+        "originalCode": "(For modifications) The slow code with 3-5 lines of context",
+        "fixedCode": "(For modifications) The optimized code with 3-5 lines of context",
+        "code": "(For additions) New optimized code to add - use when adding caching or optimization"
       },
-      "alternative": "Batch API call if backend supports it",
-      "rationale": "Sequential network calls in loop cause total time = n * average_latency. With 10 accounts and 200ms latency, this takes 2 seconds instead of 200ms with parallelization",
-      "confidence": 0.95
+      "alternative": "Better approach or algorithm",
+      "rationale": "Why this is a performance concern, referencing context if applicable",
+      "confidence": 0.0-1.0
     }
   ]
-}`;
+}
+
+IMPORTANT: Use originalCode + fixedCode when MODIFYING slow code. Use code when ADDING new optimization utilities.`;
 
 /**
  * Create performance analyzer agent

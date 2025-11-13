@@ -91,7 +91,9 @@ For each logic bug found, provide:
 - Location: file, line number, column (optional), endLine (optional)
 - ProblematicPath: The code path that triggers the bug
 - EdgeCases: List of edge cases that expose the bug
-- Suggestion: Object with description and code (the corrected code)
+- Suggestion: Object with description and EITHER:
+  - For MODIFICATIONS: "originalCode" (the buggy code) and "fixedCode" (the corrected code) - this generates a git-style diff
+  - For ADDITIONS: "code" (new code to add) - when adding entirely new validation or logic
 - Rationale: Why this is a bug, referencing import definitions if applicable
 - Confidence: 0.0 to 1.0 (how confident you are this is a real bug)
 
@@ -100,21 +102,25 @@ Output ONLY valid JSON in this format:
   "issues": [
     {
       "type": "bug",
-      "severity": "high",
-      "title": "Missing await on async function call",
-      "description": "getKeypair() returns Promise<Keypair | null> but is called without await, resulting in keypair being a Promise instead of Keypair | null",
-      "location": { "file": "hooks/use-transaction.ts", "line": 167, "column": 20, "endLine": 167 },
-      "problematicPath": "signTransaction() calls getKeypair() without await, causing keypair to be Promise object, then attempts if (!keypair) check which always fails",
-      "edgeCases": ["All calls to signTransaction will fail", "Type error not caught at compile time"],
+      "severity": "critical" | "high" | "medium" | "low",
+      "title": "Brief description of the bug",
+      "description": "Clear explanation including context from imports if relevant",
+      "location": { "file": "path/to/file.ts", "line": 167 },
+      "problematicPath": "The code path that triggers the bug",
+      "edgeCases": ["Edge case 1", "Edge case 2"],
       "suggestion": {
-        "description": "Add await keyword to properly wait for the Promise",
-        "code": "const keypair = await getKeypair();"
+        "description": "How to fix the bug",
+        "originalCode": "(For modifications) The buggy code with 3-5 lines of context",
+        "fixedCode": "(For modifications) The corrected code with 3-5 lines of context",
+        "code": "(For additions) New code to add - use when adding validation or error handling"
       },
-      "rationale": "Per IMPORTS section, getKeypair returns Promise<Keypair | null>. Without await, the variable receives a Promise object instead of the resolved value, breaking subsequent null checks and keypair usage",
-      "confidence": 0.98
+      "rationale": "Why this is a bug, referencing import definitions if applicable",
+      "confidence": 0.0-1.0
     }
   ]
-}`;
+}
+
+IMPORTANT: Use originalCode + fixedCode when MODIFYING buggy code. Use code when ADDING new validation or error handling.`;
 
 /**
  * Create logic analyzer agent

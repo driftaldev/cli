@@ -27,13 +27,19 @@ function logWithPrefix(
 
 export const logger = {
   info(message: unknown, ...optionalParams: unknown[]) {
-    logWithPrefix("info", console.log, message, optionalParams);
+    if (isDebug()) {
+      logWithPrefix("info", console.log, message, optionalParams);
+    }
   },
   warn(message: unknown, ...optionalParams: unknown[]) {
-    logWithPrefix("warn", console.warn, message, optionalParams);
+    if (isDebug()) {
+      logWithPrefix("warn", console.warn, message, optionalParams);
+    }
   },
   error(message: unknown, ...optionalParams: unknown[]) {
-    logWithPrefix("error", console.error, message, optionalParams);
+    if (isDebug()) {
+      logWithPrefix("error", console.error, message, optionalParams);
+    }
   },
   debug(message: unknown, ...optionalParams: unknown[]) {
     if (isDebug()) {

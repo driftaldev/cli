@@ -4,6 +4,7 @@ import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import { OllamaProvider } from "./providers/ollama.js";
 import { CloudProxyProvider } from "./providers/cloud-proxy.js";
+import { logger } from "../../utils/logger.js";
 
 export class ProviderFactory {
   private static providers: Map<string, LLMProvider> = new Map();
@@ -64,17 +65,17 @@ export class ProviderFactory {
       await this.testProvider(provider);
       return provider;
     } catch (error) {
-      console.warn(`Primary provider ${primaryProvider} failed:`, error);
+      logger.warn(`Primary provider ${primaryProvider} failed:`, error);
 
       // Try fallback if configured
       if (config.providers.fallback) {
         try {
           const fallbackProvider = this.getProvider(config, config.providers.fallback);
           await this.testProvider(fallbackProvider);
-          console.log(`Using fallback provider: ${config.providers.fallback}`);
+          logger.info(`Using fallback provider: ${config.providers.fallback}`);
           return fallbackProvider;
         } catch (fallbackError) {
-          console.error(`Fallback provider ${config.providers.fallback} failed:`, fallbackError);
+          logger.error(`Fallback provider ${config.providers.fallback} failed:`, fallbackError);
         }
       }
 

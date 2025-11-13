@@ -1,3 +1,5 @@
+import { logger } from "../../utils/logger.js";
+
 export type IssueType = 'bug' | 'security' | 'performance' | 'style' | 'best-practice';
 export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
@@ -208,8 +210,8 @@ export function parseIssuesFromLLM(
       tags: issue.tags || []
     }));
   } catch (error) {
-    console.error('Failed to parse LLM response as JSON:', error);
-    console.error('Raw LLM response:', llmResponse);
+    logger.error('Failed to parse LLM response as JSON:', error);
+    logger.error('Raw LLM response:', llmResponse);
     return [];
   }
 }

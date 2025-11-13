@@ -4,6 +4,7 @@
  */
 
 import { RankedItem, RelevanceRanker } from './relevance-ranker';
+import { logger } from "../../utils/logger.js";
 
 export interface EnrichedContext {
   // Original file info
@@ -92,9 +93,9 @@ export class SecurityContextStrategy implements ContextStrategy {
       : [];
 
     if (context.imports && context.imports.length > 0) {
-      console.error(`[SecurityStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`);
+      logger.debug(`[SecurityStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`);
       rankedImports.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
@@ -108,9 +109,9 @@ export class SecurityContextStrategy implements ContextStrategy {
       : [];
 
     if (context.typeDefinitions && context.typeDefinitions.length > 0) {
-      console.error(`[SecurityStrategy] Type filtering: ${context.typeDefinitions.length} → ${rankedTypes.length}`);
+      logger.debug(`[SecurityStrategy] Type filtering: ${context.typeDefinitions.length} → ${rankedTypes.length}`);
       rankedTypes.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.name} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.name} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
@@ -124,13 +125,13 @@ export class SecurityContextStrategy implements ContextStrategy {
       : [];
 
     if (context.similarPatterns && context.similarPatterns.length > 0) {
-      console.error(`[SecurityStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`);
+      logger.debug(`[SecurityStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`);
       rankedPatterns.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
-    console.error(`[SecurityStrategy] Dependencies: keeping top 3/${context.dependencies?.upstream.length || 0} upstream, 0 downstream`);
+    logger.debug(`[SecurityStrategy] Dependencies: keeping top 3/${context.dependencies?.upstream.length || 0} upstream, 0 downstream`);
 
     return {
       fileName: context.fileName,
@@ -253,9 +254,9 @@ export class PerformanceContextStrategy implements ContextStrategy {
       : [];
 
     if (context.imports && context.imports.length > 0) {
-      console.error(`[PerformanceStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`);
+      logger.debug(`[PerformanceStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`);
       rankedImports.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
@@ -269,13 +270,13 @@ export class PerformanceContextStrategy implements ContextStrategy {
       : [];
 
     if (context.similarPatterns && context.similarPatterns.length > 0) {
-      console.error(`[PerformanceStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`);
+      logger.debug(`[PerformanceStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`);
       rankedPatterns.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
-    console.error(
+    logger.debug(
       `[PerformanceStrategy] Dependencies: keeping top 5/${context.dependencies?.upstream.length || 0} upstream, ` +
       `top 3/${context.dependencies?.downstream.length || 0} downstream`
     );
@@ -391,9 +392,9 @@ export class LogicContextStrategy implements ContextStrategy {
       : [];
 
     if (context.imports && context.imports.length > 0) {
-      console.error(`[LogicStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`);
+      logger.debug(`[LogicStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`);
       rankedImports.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
@@ -407,9 +408,9 @@ export class LogicContextStrategy implements ContextStrategy {
       : [];
 
     if (context.typeDefinitions && context.typeDefinitions.length > 0) {
-      console.error(`[LogicStrategy] Type filtering: ${context.typeDefinitions.length} → ${rankedTypes.length}`);
+      logger.debug(`[LogicStrategy] Type filtering: ${context.typeDefinitions.length} → ${rankedTypes.length}`);
       rankedTypes.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.name} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.name} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
@@ -426,9 +427,9 @@ export class LogicContextStrategy implements ContextStrategy {
       : [];
 
     if (context.relatedTests && context.relatedTests.length > 0) {
-      console.error(`[LogicStrategy] Test filtering: ${context.relatedTests.length} → ${rankedTests.length}`);
+      logger.debug(`[LogicStrategy] Test filtering: ${context.relatedTests.length} → ${rankedTests.length}`);
       rankedTests.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
@@ -442,13 +443,13 @@ export class LogicContextStrategy implements ContextStrategy {
       : [];
 
     if (context.similarPatterns && context.similarPatterns.length > 0) {
-      console.error(`[LogicStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`);
+      logger.debug(`[LogicStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`);
       rankedPatterns.forEach((item, idx) => {
-        console.error(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
+        logger.debug(`  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`);
       });
     }
 
-    console.error(`[LogicStrategy] Dependencies: keeping all dependencies (no filtering)`);
+    logger.debug(`[LogicStrategy] Dependencies: keeping all dependencies (no filtering)`);
 
     return {
       fileName: context.fileName,

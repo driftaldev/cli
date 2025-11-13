@@ -1,7 +1,7 @@
 {
   "name": "driftal",
   "version": "0.1.0",
-  "description": "Driftal CLI and MCP server for local and blazing-fast code review",
+  "description": "Driftal CLI and MCP server for local first, blazing-fast code review",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,7 @@
     "mcp",
     "driftal"
   ],
-  "author": "Jay Malave",
+  "author": "Jay Malve",
   "bin": {
     "driftal": "./dist/index.js"
   },

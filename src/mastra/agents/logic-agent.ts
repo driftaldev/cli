@@ -246,7 +246,7 @@ Return ONLY valid JSON with your findings.`;
     logger.debug("[Logic Agent] No JSON found in response");
     return [];
   } catch (error) {
-    console.error("Logic analysis failed:", error);
+    logger.error("Logic analysis failed:", error);
     logger.debug("[Logic Agent] Error details:", error);
     return [];
   }

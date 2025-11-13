@@ -7,7 +7,10 @@ try {
   // console.log("[DEBUG] Changed working directory to:", process.cwd());
 } catch (e) {
   const error = e as Error;
-  console.warn("[ScoutCode] Could not change working directory:", error.message);
+  // Lazy import logger to avoid issues with working directory
+  import("../utils/logger.js").then(({ logger }) => {
+    logger.warn("[ScoutCode] Could not change working directory:", error.message);
+  });
 }
 
 import { Command } from "commander";

@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { fetch } from "undici";
+import { logger } from "../../utils/logger.js";
 
 export interface CrawledDocument {
   title?: string;
@@ -72,7 +73,7 @@ export class DocumentCrawler {
           }
         }
       } catch (error) {
-        console.warn(`Failed to crawl ${url}:`, error);
+        logger.warn(`Failed to crawl ${url}:`, error);
       }
     }
 

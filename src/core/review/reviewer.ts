@@ -7,6 +7,7 @@ import { MastraReviewOrchestrator, createMastraOrchestrator } from "../../mastra
 import { ContextEnricher } from "./context-enricher.js";
 import { loadSavedRepoName } from "../../utils/repo-name-store.js";
 import { detectStacks } from "../indexer/stack-detector.js";
+import { logger } from "../../utils/logger.js";
 
 export interface ReviewOptions {
   severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -49,7 +50,7 @@ export class CodeReviewer {
       });
       this.mastraInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize Mastra:', error);
+      logger.error('Failed to initialize Mastra:', error);
       throw new Error('Mastra initialization failed. Cannot proceed with review.');
     }
   }

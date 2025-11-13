@@ -247,7 +247,7 @@ Return ONLY valid JSON with your findings.`;
     logger.debug('[Security Agent] No JSON found in response');
     return [];
   } catch (error) {
-    console.error('Security analysis failed:', error);
+    logger.error('Security analysis failed:', error);
     logger.debug('[Security Agent] Error details:', error);
     return [];
   }

@@ -1,4 +1,5 @@
 import Redis, { type RedisOptions } from "ioredis";
+import { logger } from "../../utils/logger.js";
 
 export interface RedisCacheOptions {
   url: string;
@@ -25,7 +26,7 @@ export class RedisCache<T> {
     try {
       await this.client.connect();
     } catch (error) {
-      console.error("Failed to connect to Redis:", error);
+      logger.error("Failed to connect to Redis:", error);
       throw error;
     }
   }
@@ -48,7 +49,7 @@ export class RedisCache<T> {
         throw new Error("Invalid data");
       }
     } catch (error) {
-      console.error("Failed to parse JSON:", error);
+      logger.error("Failed to parse JSON:", error);
       return undefined;
     }
   }

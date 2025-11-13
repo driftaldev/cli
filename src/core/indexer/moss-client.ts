@@ -308,7 +308,7 @@ export class MossClient {
           : "");
 
       if (!content) {
-        console.warn(`Skipping file ${file.path}: no content provided`);
+        logger.warn(`Skipping file ${file.path}: no content provided`);
         continue;
       }
 
@@ -353,7 +353,7 @@ export class MossClient {
         message: `Indexed ${allDocs.length} chunks`,
       };
     } catch (error) {
-      console.error("Failed to create index:", error);
+      logger.error("Failed to create index:", error);
       throw new Error(
         `Failed to index: ${
           error instanceof Error ? error.message : String(error)
@@ -401,7 +401,7 @@ export class MossClient {
             : "");
 
         if (!content) {
-          console.warn(`Skipping file ${file.path}: no content provided`);
+          logger.warn(`Skipping file ${file.path}: no content provided`);
           continue;
         }
 
@@ -455,7 +455,7 @@ export class MossClient {
         message: `Updated ${filesProcessed} files`,
       };
     } catch (error) {
-      console.error("Failed to update index:", error);
+      logger.error("Failed to update index:", error);
       throw new Error(
         `Failed to update index: ${
           error instanceof Error ? error.message : String(error)
@@ -483,21 +483,21 @@ export class MossClient {
     const repos = params.repos && params.repos.length > 0 ? params.repos : [];
     const maxResults = params.max_results ?? 10;
 
-    process.stderr.write(`[MossClient] Searching for: "${params.query}"\n`);
-    process.stderr.write(`[MossClient] Max results: ${maxResults}\n`);
+    logger.debug(`[MossClient] Searching for: "${params.query}"`);
+    logger.debug(`[MossClient] Max results: ${maxResults}`);
 
     // If no specific repos, search all available indexes
     let indexesToSearch: string[] = [];
     if (repos.length === 0) {
       const allIndexes = await this.moss.listIndexes();
       indexesToSearch = allIndexes.map((idx) => idx.name);
-      process.stderr.write(
-        `[MossClient] No repos specified, searching ${indexesToSearch.length} available indexes\n`
+      logger.debug(
+        `[MossClient] No repos specified, searching ${indexesToSearch.length} available indexes`
       );
     } else {
       indexesToSearch = repos.map((r) => r.replace(/\//g, "_"));
-      process.stderr.write(
-        `[MossClient] Searching repos: ${repos.join(", ")}\n`
+      logger.debug(
+        `[MossClient] Searching repos: ${repos.join(", ")}`
       );
     }
 
@@ -507,19 +507,19 @@ export class MossClient {
       try {
         // Load the index first before querying (only once per session)
         if (!this.loadedIndexes.has(indexName)) {
-          process.stderr.write(`[MossClient] Loading index: ${indexName}...\n`);
+          logger.debug(`[MossClient] Loading index: ${indexName}...`);
           await this.moss.loadIndex(indexName);
           this.loadedIndexes.add(indexName);
-          process.stderr.write(
-            `[MossClient] Index loaded! Subsequent queries will be faster.\n`
+          logger.debug(
+            `[MossClient] Index loaded! Subsequent queries will be faster.`
           );
         }
 
-        process.stderr.write(`[MossClient] Querying index: ${indexName}\n`);
-        process.stderr.write(`[MossClient] Query details:\n`);
-        process.stderr.write(`  - Query text: "${params.query}"\n`);
-        process.stderr.write(`  - Index: ${indexName}\n`);
-        process.stderr.write(`  - Max results: ${maxResults}\n`);
+        logger.debug(`[MossClient] Querying index: ${indexName}`);
+        logger.debug(`[MossClient] Query details:`);
+        logger.debug(`  - Query text: "${params.query}"`);
+        logger.debug(`  - Index: ${indexName}`);
+        logger.debug(`  - Max results: ${maxResults}`);
 
         const queryStart = Date.now();
         const mossResult: MossSearchResult = await this.moss.query(
@@ -529,30 +529,30 @@ export class MossClient {
         );
         const queryDuration = Date.now() - queryStart;
 
-        process.stderr.write(
-          `[MossClient] Query completed in ${queryDuration}ms, found ${mossResult.docs.length} results\n`
+        logger.debug(
+          `[MossClient] Query completed in ${queryDuration}ms, found ${mossResult.docs.length} results`
         );
 
         // Log raw Moss response details
         if (mossResult.docs.length > 0) {
-          process.stderr.write(
-            `[MossClient] Raw Moss response (first 3 results):\n`
+          logger.debug(
+            `[MossClient] Raw Moss response (first 3 results):`
           );
           mossResult.docs.slice(0, 3).forEach((doc, idx) => {
-            process.stderr.write(`  Result ${idx + 1}:\n`);
-            process.stderr.write(`    - Score: ${doc.score}\n`);
-            process.stderr.write(
-              `    - File: ${doc.metadata?.file_path || "N/A"}\n`
+            logger.debug(`  Result ${idx + 1}:`);
+            logger.debug(`    - Score: ${doc.score}`);
+            logger.debug(
+              `    - File: ${doc.metadata?.file_path || "N/A"}`
             );
-            process.stderr.write(
+            logger.debug(
               `    - Lines: ${doc.metadata?.line_start || "N/A"}-${
                 doc.metadata?.line_end || "N/A"
-              }\n`
+              }`
             );
-            process.stderr.write(
+            logger.debug(
               `    - Content preview: ${doc.text
                 .substring(0, 100)
-                .replace(/\n/g, " ")}...\n`
+                .replace(/\n/g, " ")}...`
             );
           });
         }
@@ -584,8 +584,8 @@ export class MossClient {
           });
         }
       } catch (error) {
-        process.stderr.write(
-          `[MossClient] Failed to search index ${indexName}: ${error}\n`
+        logger.debug(
+          `[MossClient] Failed to search index ${indexName}: ${error}`
         );
         // Continue with other indexes
       }
@@ -595,11 +595,11 @@ export class MossClient {
     allResults.sort((a, b) => (b.score || 0) - (a.score || 0));
     const finalResults = allResults.slice(0, maxResults);
 
-    process.stderr.write(
-      `[MossClient] Total results before filtering: ${allResults.length}\n`
+    logger.debug(
+      `[MossClient] Total results before filtering: ${allResults.length}`
     );
-    process.stderr.write(
-      `[MossClient] Results after limiting to ${maxResults}: ${finalResults.length}\n`
+    logger.debug(
+      `[MossClient] Results after limiting to ${maxResults}: ${finalResults.length}`
     );
 
     // Filter by file types if specified
@@ -612,16 +612,16 @@ export class MossClient {
         : finalResults;
 
     if (params.file_types && params.file_types.length > 0) {
-      process.stderr.write(
+      logger.debug(
         `[MossClient] Filtered by file types [${params.file_types.join(
           ", "
-        )}]: ${filteredResults.length} results\n`
+        )}]: ${filteredResults.length} results`
       );
     }
 
     const duration = Date.now() - startTime;
-    process.stderr.write(
-      `[MossClient] Search completed in ${duration}ms, returning ${filteredResults.length} results\n`
+    logger.debug(
+      `[MossClient] Search completed in ${duration}ms, returning ${filteredResults.length} results`
     );
 
     return {
@@ -675,7 +675,7 @@ export class MossClient {
         message: `Indexed ${docs.length} documents from ${payload.url}`,
       };
     } catch (error) {
-      console.error("Failed to index web content:", error);
+      logger.error("Failed to index web content:", error);
       throw new Error(
         `Failed to index web content: ${
           error instanceof Error ? error.message : String(error)

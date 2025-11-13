@@ -232,7 +232,7 @@ Return ONLY valid JSON with your findings.`;
     logger.debug('[Performance Agent] No JSON found in response');
     return [];
   } catch (error) {
-    console.error('Performance analysis failed:', error);
+    logger.error('Performance analysis failed:', error);
     logger.debug('[Performance Agent] Error details:', error);
     return [];
   }

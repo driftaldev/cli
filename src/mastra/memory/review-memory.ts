@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import type { ReviewIssue, ReviewResults } from "../../core/review/issue.js";
+import { logger } from "../../utils/logger.js";
 
 export interface ReviewMemoryEntry {
   id: string;
@@ -60,7 +61,7 @@ export class ReviewMemory {
         await fs.writeFile(this.patternsFile, JSON.stringify([], null, 2));
       }
     } catch (error) {
-      console.error("Failed to initialize review memory:", error);
+      logger.error("Failed to initialize review memory:", error);
     }
   }
 
@@ -98,7 +99,7 @@ export class ReviewMemory {
 
       await fs.writeFile(this.memoryFile, JSON.stringify(memory, null, 2));
     } catch (error) {
-      console.error("Failed to store review in memory:", error);
+      logger.error("Failed to store review in memory:", error);
     }
   }
 
@@ -123,7 +124,7 @@ export class ReviewMemory {
         await this.updatePatterns(entry);
       }
     } catch (error) {
-      console.error("Failed to record feedback:", error);
+      logger.error("Failed to record feedback:", error);
     }
   }
 
@@ -152,7 +153,7 @@ export class ReviewMemory {
 
       return similar;
     } catch (error) {
-      console.error("Failed to find similar issues:", error);
+      logger.error("Failed to find similar issues:", error);
       return [];
     }
   }
@@ -183,7 +184,7 @@ export class ReviewMemory {
 
       return accepted / withFeedback.length;
     } catch (error) {
-      console.error("Failed to get acceptance rate:", error);
+      logger.error("Failed to get acceptance rate:", error);
       return 0.5;
     }
   }
@@ -205,7 +206,7 @@ export class ReviewMemory {
 
       return patterns;
     } catch (error) {
-      console.error("Failed to get learned patterns:", error);
+      logger.error("Failed to get learned patterns:", error);
       return [];
     }
   }
@@ -255,7 +256,7 @@ export class ReviewMemory {
         topIssueTypes,
       };
     } catch (error) {
-      console.error("Failed to get stats:", error);
+      logger.error("Failed to get stats:", error);
       return {
         totalReviews: 0,
         withFeedback: 0,
@@ -275,7 +276,7 @@ export class ReviewMemory {
       await fs.writeFile(this.memoryFile, JSON.stringify([], null, 2));
       await fs.writeFile(this.patternsFile, JSON.stringify([], null, 2));
     } catch (error) {
-      console.error("Failed to clear memory:", error);
+      logger.error("Failed to clear memory:", error);
     }
   }
 
@@ -345,7 +346,7 @@ export class ReviewMemory {
 
       await fs.writeFile(this.patternsFile, JSON.stringify(patterns, null, 2));
     } catch (error) {
-      console.error("Failed to update patterns:", error);
+      logger.error("Failed to update patterns:", error);
     }
   }
 

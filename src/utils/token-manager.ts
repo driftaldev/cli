@@ -78,7 +78,7 @@ export async function saveAuthTokens(tokens: AuthTokens): Promise<void> {
 export async function updateModelPreferences(primary: string, fallback?: string): Promise<void> {
   const tokens = await loadAuthTokens();
   if (!tokens) {
-    throw new Error("No authentication found. Run 'scoutcli login' first.");
+    throw new Error("No authentication found. Run 'driftal login' first.");
   }
 
   tokens.selectedModels = { primary, fallback };

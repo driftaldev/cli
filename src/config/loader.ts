@@ -384,6 +384,6 @@ export async function loadLLMConfig(
 
   // No config found - throw error
   throw new Error(
-    "No LLM configuration found. Please run 'scoutcli login' to authenticate or set ANTHROPIC_API_KEY/OPENAI_API_KEY environment variables."
+    "No LLM configuration found. Please run 'driftal login' to authenticate or set ANTHROPIC_API_KEY/OPENAI_API_KEY environment variables."
   );
 }

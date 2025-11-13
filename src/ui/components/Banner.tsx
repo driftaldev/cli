@@ -45,8 +45,8 @@ export const Banner: React.FC<BannerProps> = ({
   const displayModel = model ? formatModelName(model) : "No model selected";
   const displayDirectory = directory || process.cwd();
 
-  // ASCII art logo similar to Claude Code's pixel art style
-  const logo = `▄▄▄\n█ █\n▀▀▀`;
+  // ASCII art logo - Owl mascot
+  const logo = `(o,o)\n/)_(\\\n-"-"-`;
 
   return (
     <Box flexDirection="row" paddingX={1} paddingY={1} marginBottom={1}>

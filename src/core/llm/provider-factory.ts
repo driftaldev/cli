@@ -31,16 +31,22 @@ export class ProviderFactory {
   /**
    * Create a new provider instance
    */
-  private static createProvider(config: LLMConfig, providerName: string): LLMProvider {
+  private static createProvider(
+    config: LLMConfig,
+    providerName: string
+  ): LLMProvider {
     switch (providerName) {
       case "cloud-proxy":
-        if (!config.providers.cloudProxy || !config.providers.cloudProxy.enabled) {
+        if (
+          !config.providers.cloudProxy ||
+          !config.providers.cloudProxy.enabled
+        ) {
           throw new Error(
-            "Cloud proxy not configured. Please run 'scoutcli login' to authenticate."
+            "Cloud proxy not configured. Please run 'driftal login' to authenticate."
           );
         }
         return new CloudProxyProvider({
-          proxyUrl: config.providers.cloudProxy.proxyUrl
+          proxyUrl: config.providers.cloudProxy.proxyUrl,
         });
       case "anthropic":
         return new AnthropicProvider(config);
@@ -56,7 +62,9 @@ export class ProviderFactory {
   /**
    * Get provider with fallback chain
    */
-  static async getProviderWithFallback(config: LLMConfig): Promise<LLMProvider> {
+  static async getProviderWithFallback(
+    config: LLMConfig
+  ): Promise<LLMProvider> {
     const primaryProvider = config.providers.primary;
 
     try {
@@ -70,12 +78,18 @@ export class ProviderFactory {
       // Try fallback if configured
       if (config.providers.fallback) {
         try {
-          const fallbackProvider = this.getProvider(config, config.providers.fallback);
+          const fallbackProvider = this.getProvider(
+            config,
+            config.providers.fallback
+          );
           await this.testProvider(fallbackProvider);
           logger.info(`Using fallback provider: ${config.providers.fallback}`);
           return fallbackProvider;
         } catch (fallbackError) {
-          logger.error(`Fallback provider ${config.providers.fallback} failed:`, fallbackError);
+          logger.error(
+            `Fallback provider ${config.providers.fallback} failed:`,
+            fallbackError
+          );
         }
       }
 

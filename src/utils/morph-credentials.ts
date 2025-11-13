@@ -18,7 +18,7 @@ export async function fetchMorphCredentials(): Promise<MorphCredentials> {
 
   if (!tokens) {
     throw new Error(
-      "Not authenticated. Please run 'scoutcli login' to authenticate."
+      "Not authenticated. Please run 'driftal login' to authenticate."
     );
   }
 
@@ -36,7 +36,7 @@ export async function fetchMorphCredentials(): Promise<MorphCredentials> {
 
     if (response.status === 401) {
       throw new Error(
-        "Authentication failed. Please run 'scoutcli login' to re-authenticate."
+        "Authentication failed. Please run 'driftal login' to re-authenticate."
       );
     }
 

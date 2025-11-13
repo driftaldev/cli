@@ -22,7 +22,11 @@ import { ensureIndexedAndWatching } from "./index-cmd.js";
 import { MossClient } from "../core/indexer/moss-client.js";
 import { MorphApplier } from "../core/review/morph-applier.js";
 import { AppLayout } from "../ui/components/AppLayout.js";
-import { getCurrentModel, getVersion, getCurrentDirectory } from "../ui/components/banner-utils.js";
+import {
+  getCurrentModel,
+  getVersion,
+  getCurrentDirectory,
+} from "../ui/components/banner-utils.js";
 import { showConsoleBanner } from "../ui/components/console-banner.js";
 
 let inkModule: any | null = null;
@@ -315,7 +319,7 @@ export function createReviewCommand(): Command {
             )
           );
           console.log(
-            chalk.cyan("\nTo get started, run: " + chalk.bold("scoutcli login"))
+            chalk.cyan("\nTo get started, run: " + chalk.bold("driftal login"))
           );
           process.exit(1);
         }
@@ -510,7 +514,7 @@ export function createReviewCommand(): Command {
               version,
               model: currentModel,
               directory,
-              children: React.createElement(ReviewSummary, { results, ink })
+              children: React.createElement(ReviewSummary, { results, ink }),
             })
           );
           await app.waitUntilExit();

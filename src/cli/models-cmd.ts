@@ -1,6 +1,9 @@
 import { Command } from "commander";
 import prompts from "prompts";
-import { getAuthStatus, updateModelPreferences } from "../utils/token-manager.js";
+import {
+  getAuthStatus,
+  updateModelPreferences,
+} from "../utils/token-manager.js";
 import { logger } from "../utils/logger.js";
 import chalk from "chalk";
 import { showConsoleBanner } from "../ui/components/console-banner.js";
@@ -11,35 +14,35 @@ const SUPPORTED_MODELS = {
   "claude-3-5-sonnet-20241022": {
     provider: "anthropic",
     name: "Claude 3.5 Sonnet",
-    description: "Best balance of intelligence and speed"
+    description: "Best balance of intelligence and speed",
   },
   "claude-3-5-haiku-20241022": {
     provider: "anthropic",
     name: "Claude 3.5 Haiku",
-    description: "Fast and cost-effective"
+    description: "Fast and cost-effective",
   },
   "claude-3-opus-20240229": {
     provider: "anthropic",
     name: "Claude 3 Opus",
-    description: "Most capable, highest cost"
+    description: "Most capable, highest cost",
   },
 
   // OpenAI models
   "gpt-4-turbo": {
     provider: "openai",
     name: "GPT-4 Turbo",
-    description: "Latest GPT-4 with vision support"
+    description: "Latest GPT-4 with vision support",
   },
   "gpt-4": {
     provider: "openai",
     name: "GPT-4",
-    description: "Most capable GPT-4 model"
+    description: "Most capable GPT-4 model",
   },
   "gpt-3.5-turbo": {
     provider: "openai",
     name: "GPT-3.5 Turbo",
-    description: "Fast and affordable"
-  }
+    description: "Fast and affordable",
+  },
 };
 
 type ModelKey = keyof typeof SUPPORTED_MODELS;
@@ -54,7 +57,9 @@ async function handleModelsList() {
     const status = await getAuthStatus();
 
     if (!status.authenticated) {
-      console.log(chalk.yellow("\n⚠️  Not authenticated. Run 'scoutcli login' first.\n"));
+      console.log(
+        chalk.yellow("\n⚠️  Not authenticated. Run 'driftal login' first.\n")
+      );
       return;
     }
 
@@ -85,8 +90,11 @@ async function handleModelsList() {
       console.log("Fallback: None");
     }
 
-    console.log(chalk.gray(`\nTo change models, run: ${chalk.bold("scoutcli models select")}\n`));
-
+    console.log(
+      chalk.gray(
+        `\nTo change models, run: ${chalk.bold("driftal models select")}\n`
+      )
+    );
   } catch (error) {
     logger.error("Error listing models:", error);
     process.exit(1);
@@ -103,7 +111,9 @@ async function handleModelsSelect() {
     const status = await getAuthStatus();
 
     if (!status.authenticated) {
-      console.log(chalk.yellow("\n⚠️  Not authenticated. Run 'scoutcli login' first.\n"));
+      console.log(
+        chalk.yellow("\n⚠️  Not authenticated. Run 'driftal login' first.\n")
+      );
       return;
     }
 
@@ -112,14 +122,14 @@ async function handleModelsSelect() {
 
     const choices = Object.entries(SUPPORTED_MODELS).map(([id, info]) => ({
       title: `${info.name} - ${info.description}`,
-      value: id
+      value: id,
     }));
 
     console.log(chalk.cyan("\nUpdate Model Selection\n"));
 
     // Select primary model
     const initialPrimary = currentPrimary
-      ? choices.findIndex(c => c.value === currentPrimary)
+      ? choices.findIndex((c) => c.value === currentPrimary)
       : 0;
 
     const primaryResponse = await prompts({
@@ -127,7 +137,7 @@ async function handleModelsSelect() {
       name: "primary",
       message: "Select your primary model:",
       choices,
-      initial: initialPrimary
+      initial: initialPrimary,
     });
 
     if (!primaryResponse.primary) {
@@ -140,15 +150,17 @@ async function handleModelsSelect() {
       type: "confirm",
       name: "value",
       message: "Would you like to configure a fallback model?",
-      initial: !!currentFallback
+      initial: !!currentFallback,
     });
 
     let fallback: string | undefined;
 
     if (wantsFallback.value) {
-      const fallbackChoices = choices.filter(c => c.value !== primaryResponse.primary);
+      const fallbackChoices = choices.filter(
+        (c) => c.value !== primaryResponse.primary
+      );
       const initialFallback = currentFallback
-        ? fallbackChoices.findIndex(c => c.value === currentFallback)
+        ? fallbackChoices.findIndex((c) => c.value === currentFallback)
         : 0;
 
       const fallbackResponse = await prompts({
@@ -156,7 +168,7 @@ async function handleModelsSelect() {
         name: "fallback",
         message: "Select your fallback model:",
         choices: fallbackChoices,
-        initial: initialFallback
+        initial: initialFallback,
       });
 
       fallback = fallbackResponse.fallback;
@@ -168,7 +180,9 @@ async function handleModelsSelect() {
     const primaryInfo = SUPPORTED_MODELS[primaryResponse.primary as ModelKey];
 
     console.log(chalk.green("\n✅ Model preferences updated!\n"));
-    console.log(`Primary: ${chalk.bold(primaryInfo?.name || primaryResponse.primary)}`);
+    console.log(
+      `Primary: ${chalk.bold(primaryInfo?.name || primaryResponse.primary)}`
+    );
 
     if (fallback) {
       const fallbackInfo = SUPPORTED_MODELS[fallback as ModelKey];
@@ -178,7 +192,6 @@ async function handleModelsSelect() {
     }
 
     console.log();
-
   } catch (error) {
     logger.error("Error updating models:", error);
     process.exit(1);
@@ -193,11 +206,13 @@ async function handleModelsAvailable() {
 
   console.log(chalk.cyan("\nAvailable Models\n"));
 
-  const anthropicModels = Object.entries(SUPPORTED_MODELS)
-    .filter(([_, info]) => info.provider === "anthropic");
+  const anthropicModels = Object.entries(SUPPORTED_MODELS).filter(
+    ([_, info]) => info.provider === "anthropic"
+  );
 
-  const openaiModels = Object.entries(SUPPORTED_MODELS)
-    .filter(([_, info]) => info.provider === "openai");
+  const openaiModels = Object.entries(SUPPORTED_MODELS).filter(
+    ([_, info]) => info.provider === "openai"
+  );
 
   if (anthropicModels.length > 0) {
     console.log(chalk.bold("Anthropic Models:"));

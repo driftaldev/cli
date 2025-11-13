@@ -20,9 +20,7 @@ async function handleLogin(options: { reauth?: boolean }) {
         console.log(chalk.green("\n✅ Already authenticated!\n"));
         console.log(
           chalk.gray(
-            `To re-authenticate, run: ${chalk.bold(
-              "scoutcli login --reauth"
-            )}\n`
+            `To re-authenticate, run: ${chalk.bold("driftal login --reauth")}\n`
           )
         );
         return;
@@ -42,13 +40,13 @@ async function handleLogin(options: { reauth?: boolean }) {
       console.log(
         chalk.gray(
           `\nYou're all set! Run ${chalk.bold(
-            "scoutcli review"
+            "driftal review"
           )} to start reviewing code.\n`
         )
       );
       console.log(
         chalk.gray(
-          `To configure models, run: ${chalk.bold("scoutcli models select")}\n`
+          `To configure models, run: ${chalk.bold("driftal models select")}\n`
         )
       );
     } else {

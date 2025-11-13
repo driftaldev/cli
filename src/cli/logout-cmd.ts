@@ -26,7 +26,7 @@ async function handleLogout(options: { force?: boolean }) {
         type: "confirm",
         name: "value",
         message: "Are you sure you want to log out?",
-        initial: false
+        initial: false,
       });
 
       if (!response.value) {
@@ -39,8 +39,9 @@ async function handleLogout(options: { force?: boolean }) {
     await deleteAuthTokens();
 
     console.log(chalk.green("\n✅ Successfully logged out.\n"));
-    console.log(chalk.gray(`To log back in, run: ${chalk.bold("scoutcli login")}\n`));
-
+    console.log(
+      chalk.gray(`To log back in, run: ${chalk.bold("driftal login")}\n`)
+    );
   } catch (error) {
     logger.error("Logout error:", error);
     process.exit(1);

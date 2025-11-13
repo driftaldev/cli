@@ -84,7 +84,7 @@ export class MastraReviewOrchestrator {
         const tokens = await loadAuthTokens();
         if (!tokens?.accessToken) {
           throw new Error(
-            "Not authenticated with cloud proxy. Please run 'scoutcli login'."
+            "Not authenticated with cloud proxy. Please run 'driftal login'."
           );
         }
 
@@ -101,7 +101,7 @@ export class MastraReviewOrchestrator {
           apiKey: tokens.accessToken,
           headers: {
             Authorization: `Bearer ${tokens.accessToken}`,
-            "X-Scout-CLI-Version": `scoutcli/${CLI_VERSION}`,
+            "X-Driftal-CLI-Version": `driftal/${CLI_VERSION}`,
           },
         };
       }

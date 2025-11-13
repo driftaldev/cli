@@ -4,7 +4,7 @@ import {
   type LLMGenerateOptions,
   type LLMGenerateResponse,
   type LLMStreamChunk,
-  type LLMMessage
+  type LLMMessage,
 } from "../provider.js";
 import type { LLMConfig } from "../../../config/schema.js";
 
@@ -17,7 +17,7 @@ export class AnthropicProvider extends LLMProvider {
     const anthropicConfig = config.providers.anthropic;
     if (!anthropicConfig) {
       throw new Error(
-        "Anthropic configuration not found. Please run 'scoutcli login' or set ANTHROPIC_API_KEY environment variable."
+        "Anthropic configuration not found. Please run 'driftal login' or set ANTHROPIC_API_KEY environment variable."
       );
     }
 
@@ -28,7 +28,7 @@ export class AnthropicProvider extends LLMProvider {
 
     if (!apiKey) {
       throw new Error(
-        `Anthropic API key not found. Please run 'scoutcli login' to authenticate or set ${anthropicConfig.apiKeyEnv} environment variable.`
+        `Anthropic API key not found. Please run 'driftal login' to authenticate or set ${anthropicConfig.apiKeyEnv} environment variable.`
       );
     }
 
@@ -40,8 +40,12 @@ export class AnthropicProvider extends LLMProvider {
   async generate(options: LLMGenerateOptions): Promise<LLMGenerateResponse> {
     return this.retryWithBackoff(async () => {
       // Separate system messages from user/assistant messages
-      const systemMessages = options.messages.filter((m) => m.role === "system");
-      const conversationMessages = options.messages.filter((m) => m.role !== "system");
+      const systemMessages = options.messages.filter(
+        (m) => m.role === "system"
+      );
+      const conversationMessages = options.messages.filter(
+        (m) => m.role !== "system"
+      );
 
       // Combine system messages into one
       const systemPrompt = systemMessages.map((m) => m.content).join("\n\n");
@@ -53,8 +57,8 @@ export class AnthropicProvider extends LLMProvider {
         system: systemPrompt || undefined,
         messages: conversationMessages.map((m) => ({
           role: m.role === "user" ? "user" : "assistant",
-          content: m.content
-        }))
+          content: m.content,
+        })),
       });
 
       const content = response.content
@@ -67,17 +71,22 @@ export class AnthropicProvider extends LLMProvider {
         usage: {
           promptTokens: response.usage.input_tokens,
           completionTokens: response.usage.output_tokens,
-          totalTokens: response.usage.input_tokens + response.usage.output_tokens
+          totalTokens:
+            response.usage.input_tokens + response.usage.output_tokens,
         },
         model: response.model,
-        finishReason: this.mapStopReason(response.stop_reason)
+        finishReason: this.mapStopReason(response.stop_reason),
       };
     });
   }
 
-  async *generateStream(options: LLMGenerateOptions): AsyncGenerator<LLMStreamChunk> {
+  async *generateStream(
+    options: LLMGenerateOptions
+  ): AsyncGenerator<LLMStreamChunk> {
     const systemMessages = options.messages.filter((m) => m.role === "system");
-    const conversationMessages = options.messages.filter((m) => m.role !== "system");
+    const conversationMessages = options.messages.filter(
+      (m) => m.role !== "system"
+    );
 
     const systemPrompt = systemMessages.map((m) => m.content).join("\n\n");
 
@@ -88,21 +97,24 @@ export class AnthropicProvider extends LLMProvider {
       system: systemPrompt || undefined,
       messages: conversationMessages.map((m) => ({
         role: m.role === "user" ? "user" : "assistant",
-        content: m.content
+        content: m.content,
       })),
-      stream: true
+      stream: true,
     });
 
     for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
         yield {
           delta: event.delta.text,
-          done: false
+          done: false,
         };
       } else if (event.type === "message_stop") {
         yield {
           delta: "",
-          done: true
+          done: true,
         };
       }
     }

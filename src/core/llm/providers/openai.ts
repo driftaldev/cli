@@ -3,7 +3,7 @@ import {
   LLMProvider,
   type LLMGenerateOptions,
   type LLMGenerateResponse,
-  type LLMStreamChunk
+  type LLMStreamChunk,
 } from "../provider.js";
 import type { LLMConfig } from "../../../config/schema.js";
 
@@ -16,7 +16,7 @@ export class OpenAIProvider extends LLMProvider {
     const openaiConfig = config.providers.openai;
     if (!openaiConfig) {
       throw new Error(
-        "OpenAI configuration not found. Please run 'scoutcli login' or set OPENAI_API_KEY environment variable."
+        "OpenAI configuration not found. Please run 'driftal login' or set OPENAI_API_KEY environment variable."
       );
     }
 
@@ -27,7 +27,7 @@ export class OpenAIProvider extends LLMProvider {
 
     if (!apiKey) {
       throw new Error(
-        `OpenAI API key not found. Please run 'scoutcli login' to authenticate or set ${openaiConfig.apiKeyEnv} environment variable.`
+        `OpenAI API key not found. Please run 'driftal login' to authenticate or set ${openaiConfig.apiKeyEnv} environment variable.`
       );
     }
 
@@ -44,8 +44,8 @@ export class OpenAIProvider extends LLMProvider {
         temperature: options.temperature ?? 0.7,
         messages: options.messages.map((m) => ({
           role: m.role,
-          content: m.content
-        }))
+          content: m.content,
+        })),
       });
 
       const choice = response.choices[0];
@@ -58,24 +58,26 @@ export class OpenAIProvider extends LLMProvider {
         usage: {
           promptTokens: response.usage?.prompt_tokens || 0,
           completionTokens: response.usage?.completion_tokens || 0,
-          totalTokens: response.usage?.total_tokens || 0
+          totalTokens: response.usage?.total_tokens || 0,
         },
         model: response.model,
-        finishReason: this.mapFinishReason(choice.finish_reason)
+        finishReason: this.mapFinishReason(choice.finish_reason),
       };
     });
   }
 
-  async *generateStream(options: LLMGenerateOptions): AsyncGenerator<LLMStreamChunk> {
+  async *generateStream(
+    options: LLMGenerateOptions
+  ): AsyncGenerator<LLMStreamChunk> {
     const stream = await this.client.chat.completions.create({
       model: this.modelName,
       max_tokens: options.maxTokens || this.maxTokens,
       temperature: options.temperature ?? 0.7,
       messages: options.messages.map((m) => ({
         role: m.role,
-        content: m.content
+        content: m.content,
       })),
-      stream: true
+      stream: true,
     });
 
     for await (const chunk of stream) {
@@ -85,14 +87,14 @@ export class OpenAIProvider extends LLMProvider {
       if (delta) {
         yield {
           delta,
-          done: false
+          done: false,
         };
       }
 
       if (finishReason) {
         yield {
           delta: "",
-          done: true
+          done: true,
         };
       }
     }

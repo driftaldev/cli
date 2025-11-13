@@ -207,6 +207,8 @@ function parseFileBlock(block: string): DiffFile | null {
   // Parse chunks
   const chunks: DiffChunk[] = [];
   let currentChunk: DiffChunk | null = null;
+  let oldLineNum = 0;
+  let newLineNum = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -227,6 +229,9 @@ function parseFileBlock(block: string): DiffFile | null {
           lines: [],
           header: chunkMatch[5]?.trim() || ''
         };
+        // Initialize line number counters for this chunk
+        oldLineNum = currentChunk.oldStart;
+        newLineNum = currentChunk.newStart;
       }
     } else if (currentChunk && (line.startsWith('+') || line.startsWith('-') || line.startsWith(' '))) {
       // Parse diff lines
@@ -236,9 +241,13 @@ function parseFileBlock(block: string): DiffFile | null {
       currentChunk.lines.push({
         type,
         content,
-        oldLineNumber: type !== 'added' ? currentChunk.oldStart + currentChunk.lines.filter(l => l.type !== 'added').length : undefined,
-        newLineNumber: type !== 'removed' ? currentChunk.newStart + currentChunk.lines.filter(l => l.type !== 'removed').length : undefined
+        oldLineNumber: type !== 'added' ? oldLineNum : undefined,
+        newLineNumber: type !== 'removed' ? newLineNum : undefined
       });
+
+      // Increment line numbers for next iteration
+      if (type !== 'added') oldLineNum++;
+      if (type !== 'removed') newLineNum++;
     }
   }
 

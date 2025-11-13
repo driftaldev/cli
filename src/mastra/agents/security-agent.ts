@@ -88,12 +88,14 @@ When analyzing code, you will receive enriched context including:
 
 ## Output Format:
 
+**IMPORTANT**: The code you receive includes line numbers in the format "lineNum: code". Extract the line number from this format for the location field.
+
 For each security issue found, provide:
 - Type: security
 - Severity: critical | high | medium | low
 - Title: Brief description of the vulnerability
 - Description: Detailed explanation including context from imports/types if relevant
-- Location: file, line number, column (optional), endLine (optional)
+- Location: file, line number (extract from "lineNum: code" format), column (optional), endLine (optional)
 - CWE ID: If applicable (e.g., CWE-89, CWE-79, CWE-352)
 - Suggestion: Object with description and EITHER:
   - For MODIFICATIONS: "originalCode" (the vulnerable code) and "fixedCode" (the secure code) - this generates a git-style diff

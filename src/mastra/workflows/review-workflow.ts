@@ -538,7 +538,7 @@ export const rankIssuesStep = createStep({
 });
 
 /**
- * Helper: Extract changed code from diff file
+ * Helper: Extract changed code from diff file with line numbers
  */
 function extractChangedCode(file: DiffFile): string {
   const lines: string[] = [];
@@ -550,7 +550,9 @@ function extractChangedCode(file: DiffFile): string {
 
     for (const line of chunk.lines) {
       if (line.type === "context" || line.type === "added") {
-        lines.push(line.content);
+        // Include line number so agents can reference the correct location
+        const lineNum = line.newLineNumber ?? line.oldLineNumber ?? '?';
+        lines.push(`${lineNum}: ${line.content}`);
       }
     }
   }

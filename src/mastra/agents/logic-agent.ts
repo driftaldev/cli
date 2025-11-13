@@ -83,12 +83,14 @@ When analyzing code, you will receive enriched context including:
 
 ## Output Format:
 
+**IMPORTANT**: The code you receive includes line numbers in the format "lineNum: code". Extract the line number from this format for the location field.
+
 For each logic bug found, provide:
 - Type: bug
 - Severity: critical | high | medium | low
 - Title: Brief description of the bug
 - Description: Clear explanation including context from imports if relevant
-- Location: file, line number, column (optional), endLine (optional)
+- Location: file, line number (extract from "lineNum: code" format), column (optional), endLine (optional)
 - ProblematicPath: The code path that triggers the bug
 - EdgeCases: List of edge cases that expose the bug
 - Suggestion: Object with description and EITHER:

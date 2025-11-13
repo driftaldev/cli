@@ -73,12 +73,14 @@ When analyzing code, you will receive enriched context including:
 
 ## Output Format:
 
+**IMPORTANT**: The code you receive includes line numbers in the format "lineNum: code". Extract the line number from this format for the location field.
+
 For each performance issue found, provide:
 - Type: performance
 - Severity: high | medium | low
 - Title: Brief description of the issue
 - Description: Detailed explanation including context from imports if relevant
-- Location: file, line number, column (optional), endLine (optional)
+- Location: file, line number (extract from "lineNum: code" format), column (optional), endLine (optional)
 - Complexity: Time/space complexity (e.g., "O(n²)")
 - Impact: Estimated impact (high/medium/low)
 - Suggestion: Object with description and EITHER:

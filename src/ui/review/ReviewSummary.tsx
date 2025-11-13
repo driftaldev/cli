@@ -7,6 +7,7 @@ type InkModule = typeof import("ink");
 type ReviewSummaryProps = {
   results: ReviewResults;
   ink: InkModule;
+  durationSeconds?: string;
 };
 
 const severityOrder: IssueSeverity[] = ["critical", "high", "medium", "low", "info"];
@@ -69,7 +70,7 @@ function DiffBlock({
   );
 }
 
-export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) => {
+export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, durationSeconds }) => {
   const { Box, Text, useApp, useInput } = ink;
   const { exit } = useApp();
   const ranker = useMemo(() => new IssueRanker(), []);
@@ -133,9 +134,12 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink }) =>
         )}
       </Box>
 
-      {/* Footer with exit instruction */}
-      <Box marginTop={1}>
-        <Text color="gray" dimColor>Press any key to exit...</Text>
+      {/* Footer with duration and exit instruction */}
+      <Box marginTop={1} flexDirection="column">
+        {durationSeconds && (
+          <Text color="green">Review completed in {durationSeconds}s</Text>
+        )}
+        <Text color="gray" dimColor>Press Ctrl + C to exit...</Text>
       </Box>
     </Box>
   );

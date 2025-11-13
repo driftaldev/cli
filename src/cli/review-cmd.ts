@@ -296,7 +296,6 @@ export function createReviewCommand(): Command {
       // Show banner at the very start
       await showConsoleBanner();
 
-      const reviewStartTime = Date.now();
       const spinner = ora("Initializing review...").start();
 
       try {
@@ -407,6 +406,9 @@ export function createReviewCommand(): Command {
           selectedFiles = files;
         }
 
+        // Start timing after file selection is complete
+        const reviewStartTime = Date.now();
+
         // 4. Get changes to review
         spinner.text = "Analyzing changes...";
         let diff;
@@ -514,7 +516,7 @@ export function createReviewCommand(): Command {
               version,
               model: currentModel,
               directory,
-              children: React.createElement(ReviewSummary, { results, ink }),
+              children: React.createElement(ReviewSummary, { results, ink, durationSeconds }),
             })
           );
           await app.waitUntilExit();

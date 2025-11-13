@@ -1,7 +1,12 @@
 import React, { useMemo } from "react";
-import type { ReviewResults, ReviewIssue, IssueSeverity } from "../../core/review/issue.js";
+import type {
+  ReviewResults,
+  ReviewIssue,
+  IssueSeverity,
+} from "../../core/review/issue.js";
 import { IssueRanker } from "../../core/review/issue.js";
 import { generateUnifiedDiff } from "../../core/review/utils/diff-generator.js";
+import { formatCodeSync } from "../../core/review/utils/code-formatter.js";
 
 type InkModule = typeof import("ink");
 
@@ -11,14 +16,20 @@ type ReviewSummaryProps = {
   durationSeconds?: string;
 };
 
-const severityOrder: IssueSeverity[] = ["critical", "high", "medium", "low", "info"];
+const severityOrder: IssueSeverity[] = [
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "info",
+];
 
 const severityColor: Record<IssueSeverity, string> = {
   critical: "red",
   high: "redBright",
   medium: "yellow",
   low: "blueBright",
-  info: "gray"
+  info: "gray",
 };
 
 function truncate(text: string, max: number): string {
@@ -45,11 +56,15 @@ function DiffBlock({
     .split(/\r?\n/)
     .filter((line) => line.trim().length > 0)
     .map((line) => {
-      if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff")) {
+      if (
+        line.startsWith("+++") ||
+        line.startsWith("---") ||
+        line.startsWith("diff")
+      ) {
         return { line, color: "gray" as const };
       }
       if (line.startsWith("@@")) {
-        return { line, color: "magenta" as const };
+        return { line, color: "gray" as const };
       }
       if (line.startsWith("+")) {
         return { line, color: "green" as const };
@@ -71,7 +86,11 @@ function DiffBlock({
   );
 }
 
-export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, durationSeconds }) => {
+export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
+  results,
+  ink,
+  durationSeconds,
+}) => {
   const { Box, Text, useApp, useInput } = ink;
   const { exit } = useApp();
   const ranker = useMemo(() => new IssueRanker(), []);
@@ -79,7 +98,9 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, dura
   const groupedIssues = useMemo(() => {
     const bySeverity = ranker.groupBySeverity(results.issues);
     return severityOrder.flatMap((severity) => {
-      return bySeverity.get(severity)?.map((issue) => ({ severity, issue })) ?? [];
+      return (
+        bySeverity.get(severity)?.map((issue) => ({ severity, issue })) ?? []
+      );
     });
   }, [ranker, results.issues]);
 
@@ -108,15 +129,28 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, dura
             if (suggestion) {
               // Priority 1: Check if we have originalCode and fixedCode to generate a diff
               if (suggestion.originalCode && suggestion.fixedCode) {
-                const generatedDiff = generateUnifiedDiff(
+                // Format the code before generating the diff
+                const formattedOriginal = formatCodeSync(
                   suggestion.originalCode,
+                  issue.location.file
+                );
+                const formattedFixed = formatCodeSync(
                   suggestion.fixedCode,
+                  issue.location.file
+                );
+
+                const generatedDiff = generateUnifiedDiff(
+                  formattedOriginal,
+                  formattedFixed,
                   3
                 );
                 diffContent = generatedDiff || undefined;
               }
               // Priority 2: Use pre-generated diff if available
-              else if (suggestion.diff?.trim() && suggestion.diff.trim().length > 0) {
+              else if (
+                suggestion.diff?.trim() &&
+                suggestion.diff.trim().length > 0
+              ) {
                 diffContent = suggestion.diff.trim();
               }
               // Priority 3: Fallback to simple additions from code field
@@ -143,7 +177,9 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, dura
                 {issue.description && issue.description.trim().length > 0 && (
                   <Text color="white">{issue.description.trim()}</Text>
                 )}
-                {diffContent && <DiffBlock diff={diffContent} Box={Box} Text={Text} />}
+                {diffContent && (
+                  <DiffBlock diff={diffContent} Box={Box} Text={Text} />
+                )}
               </Box>
             );
           })
@@ -155,11 +191,12 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({ results, ink, dura
         {durationSeconds && (
           <Text color="green">Review completed in {durationSeconds}s</Text>
         )}
-        <Text color="gray" dimColor>Press Ctrl + C to exit...</Text>
+        <Text color="gray" dimColor>
+          Press Ctrl + C to exit...
+        </Text>
       </Box>
     </Box>
   );
 };
 
 export default ReviewSummary;
-

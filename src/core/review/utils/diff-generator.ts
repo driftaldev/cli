@@ -12,8 +12,8 @@ export function generateUnifiedDiff(
   fixedCode: string,
   context: number = 3
 ): string | null {
-  // Validate inputs
-  if (!originalCode || !fixedCode) {
+  // Validate inputs - ensure they are strings
+  if (!originalCode || !fixedCode || typeof originalCode !== 'string' || typeof fixedCode !== 'string') {
     return null;
   }
 
@@ -22,13 +22,17 @@ export function generateUnifiedDiff(
     return null;
   }
 
+  // Ensure both strings end with a newline to avoid "\ No newline at end of file" messages
+  const normalizedOriginal = originalCode.endsWith('\n') ? originalCode : originalCode + '\n';
+  const normalizedFixed = fixedCode.endsWith('\n') ? fixedCode : fixedCode + '\n';
+
   // Generate unified diff patch
   // The createPatch function signature:
   // createPatch(fileName, oldStr, newStr, oldHeader, newHeader, options)
   const patch = createPatch(
     'code',
-    originalCode,
-    fixedCode,
+    normalizedOriginal,
+    normalizedFixed,
     '',
     '',
     { context }
@@ -39,8 +43,11 @@ export function generateUnifiedDiff(
   const lines = patch.split('\n');
   const diffLines = lines.slice(4); // Skip: Index, ===, ---, +++
 
+  // Filter out "\ No newline at end of file" messages
+  const cleanedLines = diffLines.filter(line => !line.startsWith('\\ No newline'));
+
   // Join back and trim
-  const diff = diffLines.join('\n').trim();
+  const diff = cleanedLines.join('\n').trim();
 
   return diff || null;
 }

@@ -38,6 +38,11 @@ export interface ReviewResults {
     complexity: string;
     riskScore: number;
   };
+  // Metadata for backend logging
+  totalTokens?: number; // Total tokens used across all LLM calls
+  linesOfCodeReviewed?: number; // Lines of code reviewed (additions + deletions or file lines)
+  model?: string; // Model used for the review
+  repositoryName?: string; // Repository name
 }
 
 export class IssueRanker {

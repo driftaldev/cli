@@ -6,6 +6,7 @@ import type { EnrichedContext } from '../../core/review/context-strategies.js';
 import { SecurityContextStrategy } from '../../core/review/context-strategies.js';
 import type { Stack } from '@/core/indexer/stack-detector.js';
 import { getStackSpecificInstructions } from './stack-prompts.js';
+import { logLLMResponseToFile } from '../workflows/review-workflow.js';
 
 const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
@@ -231,6 +232,9 @@ Return ONLY valid JSON with your findings.`;
     });
 
     logger.debug('[Security Agent] Raw LLM response:', result.text);
+
+    // Log LLM response to file
+    await logLLMResponseToFile(context.fileName, "Security", result.text);
 
     // Parse the JSON response
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);

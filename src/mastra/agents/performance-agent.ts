@@ -6,6 +6,7 @@ import type { EnrichedContext } from '../../core/review/context-strategies.js';
 import { PerformanceContextStrategy } from '../../core/review/context-strategies.js';
 import type { Stack } from '@/core/indexer/stack-detector.js';
 import { getStackSpecificInstructions } from './stack-prompts.js';
+import { logLLMResponseToFile } from '../workflows/review-workflow.js';
 
 const PERFORMANCE_ANALYZER_INSTRUCTIONS = `You are a performance optimization expert with deep contextual understanding.
 
@@ -216,6 +217,9 @@ Return ONLY valid JSON with your findings.`;
     });
 
     logger.debug('[Performance Agent] Raw LLM response:', result.text);
+
+    // Log LLM response to file
+    await logLLMResponseToFile(context.fileName, "Performance", result.text);
 
     // Parse the JSON response
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);

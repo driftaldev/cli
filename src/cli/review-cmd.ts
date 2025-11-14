@@ -28,6 +28,12 @@ import {
   getCurrentDirectory,
 } from "../ui/components/banner-utils.js";
 import { showConsoleBanner } from "../ui/components/console-banner.js";
+import { loadAuthTokens } from "../utils/token-manager.js";
+import { logger } from "../utils/logger.js";
+import type {
+  ReviewResults,
+  ReviewIssue as ReviewIssueType,
+} from "../core/review/issue.js";
 
 let inkModule: any | null = null;
 
@@ -38,6 +44,78 @@ async function getInk() {
     inkModule = await import("ink");
   }
   return inkModule;
+}
+
+/**
+ * Log review results to backend for analytics
+ */
+async function logReviewToBackend(
+  results: ReviewResults,
+  userEmail: string
+): Promise<void> {
+  try {
+    const tokens = await loadAuthTokens();
+    if (!tokens) {
+      logger.debug("Not authenticated, skipping review logging");
+      return;
+    }
+
+    const CLOUD_PROXY_URL =
+      process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev";
+
+    // Format issues for backend
+    const formattedIssues = results.issues.map((issue) => ({
+      title: issue.title,
+      severity: issue.severity === "info" ? "low" : issue.severity, // Map 'info' to 'low' for backend
+      file_path: issue.location.file,
+      line_number: issue.location.line,
+      description: issue.description || undefined,
+      suggestion: issue.suggestion?.description || undefined,
+    }));
+
+    const requestBody = {
+      email: userEmail,
+      model: results.model || "claude-3-5-sonnet-20241022",
+      total_tokens: results.totalTokens || 0,
+      lines_of_code_reviewed: results.linesOfCodeReviewed || 0,
+      review_duration_ms: results.duration || 0,
+      repository_name: results.repositoryName,
+      issues: formattedIssues,
+    };
+
+    logger.debug("Logging review to backend", {
+      issueCount: formattedIssues.length,
+      totalTokens: requestBody.total_tokens,
+      repository: requestBody.repository_name,
+    });
+
+    const response = await fetch(`${CLOUD_PROXY_URL}/v1/reviews`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokens.accessToken}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn("Failed to log review to backend", {
+        status: response.status,
+        error: errorText,
+      });
+      return;
+    }
+
+    const data = await response.json();
+    logger.debug("Review logged successfully", {
+      reviewId: data.review_id,
+      issuesCreated: data.issues_created,
+    });
+  } catch (error) {
+    // Don't fail the review if logging fails
+    logger.warn("Error logging review to backend", { error });
+  }
 }
 
 /**
@@ -466,6 +544,14 @@ export function createReviewCommand(): Command {
           `Review complete - found ${results.issues.length} issue(s) in ${durationSeconds}s`
         );
 
+        // Log review to backend (async, non-blocking)
+        const tokens = await loadAuthTokens();
+        if (tokens && tokens.userEmail) {
+          logReviewToBackend(results, tokens.userEmail).catch((err) => {
+            logger.debug("Failed to log review to backend", { error: err });
+          });
+        }
+
         // 6. Show similar issues if requested
         if (options.similar) {
           const memory = reviewer.getMemory();
@@ -512,7 +598,11 @@ export function createReviewCommand(): Command {
               version,
               model: currentModel,
               directory,
-              children: React.createElement(ReviewSummary, { results, ink, durationSeconds }),
+              children: React.createElement(ReviewSummary, {
+                results,
+                ink,
+                durationSeconds,
+              }),
             })
           );
           await app.waitUntilExit();

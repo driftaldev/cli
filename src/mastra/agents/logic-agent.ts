@@ -6,6 +6,7 @@ import type { EnrichedContext } from "../../core/review/context-strategies.js";
 import { LogicContextStrategy } from "../../core/review/context-strategies.js";
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
+import { logLLMResponseToFile } from "../workflows/review-workflow.js";
 
 const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
 
@@ -230,6 +231,9 @@ Return ONLY valid JSON with your findings.`;
     });
 
     logger.debug("[Logic Agent] Raw LLM response:", result.text);
+
+    // Log LLM response to file
+    await logLLMResponseToFile(context.fileName, "Logic", result.text);
 
     // Parse the JSON response
     const jsonMatch = result.text.match(/\{[\s\S]*\}/);

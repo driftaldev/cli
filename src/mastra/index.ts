@@ -12,7 +12,7 @@ import type { Stack } from "../core/indexer/stack-detector.js";
 import packageJson from "../../package.json" assert { type: "json" };
 
 const DEFAULT_PROXY_URL =
-  process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev/v1";
+  process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev";
 const CLI_VERSION = packageJson.version ?? "dev";
 
 export interface MastraConfig {
@@ -90,6 +90,11 @@ export class MastraReviewOrchestrator {
 
         const proxyUrl =
           llmConfig.providers.cloudProxy?.proxyUrl || DEFAULT_PROXY_URL;
+        // Mastra/Vercel AI SDK appends /chat/completions to the URL,
+        // so we need to include /v1 in the base URL to get /v1/chat/completions
+        const baseUrl = proxyUrl.endsWith("/")
+          ? `${proxyUrl}v1`
+          : `${proxyUrl}/v1`;
         const selectedModel =
           tokens.selectedModels?.primary || "openai/gpt-4-turbo";
         const { providerId, modelId } =
@@ -97,7 +102,7 @@ export class MastraReviewOrchestrator {
 
         return {
           id: `${providerId}/${modelId}`,
-          url: proxyUrl,
+          url: baseUrl,
           apiKey: tokens.accessToken,
           headers: {
             Authorization: `Bearer ${tokens.accessToken}`,

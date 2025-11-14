@@ -125,6 +125,63 @@ END OF CONTEXT LOG
 }
 
 /**
+ * Utility function to log LLM responses to .driftal folder
+ */
+export async function logLLMResponseToFile(
+  filePath: string,
+  agentName: string,
+  responseText: string
+): Promise<void> {
+  // Only log responses when DRIFTAL_DEBUG=1 is set
+  if (process.env.DRIFTAL_DEBUG !== "1") {
+    return;
+  }
+
+  try {
+    // Get the working directory (where CLI is run from)
+    const workingDir = process.cwd();
+    const responsesDir = path.join(
+      workingDir,
+      ".driftal",
+      "debug",
+      "responses"
+    );
+
+    // Ensure .driftal directory exists
+    await fs.mkdir(responsesDir, { recursive: true });
+
+    // Create filename: <filename>_<agentName>_<timestamp>.txt
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const baseFileName = path.basename(filePath).replace(/\//g, "_");
+    const responseFileName = `${baseFileName}_${agentName}_${timestamp}.txt`;
+    const responseFilePath = path.join(responsesDir, responseFileName);
+
+    // Format the response for logging
+    const logContent = `
+================================================================================
+LLM RESPONSE FOR FILE: ${filePath}
+AGENT: ${agentName}
+TIMESTAMP: ${new Date().toISOString()}
+================================================================================
+
+${responseText}
+
+================================================================================
+END OF LLM RESPONSE
+================================================================================
+`;
+
+    // Write to file
+    await fs.writeFile(responseFilePath, logContent, "utf-8");
+    logger.debug(
+      `[ResponseLogger] LLM response logged to: ${responseFilePath}`
+    );
+  } catch (error) {
+    logger.error(`[ResponseLogger] Failed to log LLM response: ${error}`);
+  }
+}
+
+/**
  * Step 1: Analyze changes to understand complexity and risk
  */
 export const analyzeChangesStep = createStep({
@@ -367,10 +424,7 @@ export const runAllAgentsInParallelStep = createStep({
             const fileIssues = await analysisFn(agent, context);
             return fileIssues;
           } catch (error) {
-            logger.warn(
-              `[${agentName}:${file.path}] Analysis failed:`,
-              error
-            );
+            logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);
             return [];
           }
         })
@@ -551,7 +605,7 @@ function extractChangedCode(file: DiffFile): string {
     for (const line of chunk.lines) {
       if (line.type === "context" || line.type === "added") {
         // Include line number so agents can reference the correct location
-        const lineNum = line.newLineNumber ?? line.oldLineNumber ?? '?';
+        const lineNum = line.newLineNumber ?? line.oldLineNumber ?? "?";
         lines.push(`${lineNum}: ${line.content}`);
       }
     }

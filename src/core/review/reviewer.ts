@@ -137,6 +137,17 @@ export class CodeReviewer {
 
     const duration = Date.now() - startTime;
 
+    // Calculate lines of code reviewed
+    // For git diff: additions + deletions gives total lines changed
+    const linesOfCodeReviewed = diff.stats.additions + diff.stats.deletions;
+
+    // Get total tokens from workflow result (if available)
+    // The Mastra workflow may aggregate token usage from all LLM calls
+    const totalTokens = workflowResult.totalTokens ?? 0;
+
+    // Get model from config
+    const model = this.llmConfig.model || 'claude-3-5-sonnet-20241022';
+
     const results: ReviewResults = {
       issues,
       filesReviewed: diff.files.length,
@@ -152,7 +163,12 @@ export class CodeReviewer {
         filesChanged: (analysis as any).filesChanged ?? diff.files.length,
         linesAdded: (analysis as any).linesAdded ?? diff.stats.additions,
         linesRemoved: (analysis as any).linesRemoved ?? diff.stats.deletions
-      }
+      },
+      // Metadata for backend logging
+      totalTokens,
+      linesOfCodeReviewed,
+      model,
+      repositoryName: repoName || undefined
     };
 
     // Store in memory if enabled

@@ -9,7 +9,7 @@ import { loadAuthTokens, AuthTokens } from "../../../utils/token-manager.js";
 import { logger } from "../../../utils/logger.js";
 
 const CLOUD_PROXY_URL =
-  process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev/v1";
+  process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev";
 
 export interface CloudProxyConfig {
   proxyUrl?: string;
@@ -54,6 +54,20 @@ export class CloudProxyProvider extends LLMProvider {
     }
 
     return this.tokens.accessToken;
+  }
+
+  /**
+   * Get the selected model from auth.json with fallback to default
+   */
+  private async getSelectedModel(): Promise<string> {
+    // Ensure tokens are loaded
+    await this.ensureAuthenticated();
+
+    // Get model from auth.json, fallback to default
+    const model =
+      this.tokens?.selectedModels?.primary || "claude-3-5-sonnet-20241022";
+
+    return model;
   }
 
   /**
@@ -129,8 +143,13 @@ export class CloudProxyProvider extends LLMProvider {
   ): Promise<LLMGenerateResponse> {
     logger.debug("Sending request to cloud proxy...");
 
+    // Get model from auth.json (~/.driftal/auth.json)
+    const model = await this.getSelectedModel();
+    logger.debug("Using model from auth.json", { model });
+
     const requestBody = {
       messages: request.messages,
+      model, // Include model from auth.json
       temperature: request.temperature,
       max_tokens: request.maxTokens,
       stop_sequences: request.stopSequences,
@@ -154,8 +173,8 @@ export class CloudProxyProvider extends LLMProvider {
           choice.finish_reason === "stop"
             ? "end_turn"
             : choice.finish_reason === "length"
-            ? "max_tokens"
-            : "end_turn",
+              ? "max_tokens"
+              : "end_turn",
         usage: data.usage
           ? {
               inputTokens: data.usage.prompt_tokens || 0,
@@ -191,8 +210,13 @@ export class CloudProxyProvider extends LLMProvider {
   ): AsyncGenerator<LLMStreamChunk, void, unknown> {
     logger.debug("Sending streaming request to cloud proxy...");
 
+    // Get model from auth.json (~/.driftal/auth.json)
+    const model = await this.getSelectedModel();
+    logger.debug("Using model from auth.json for streaming", { model });
+
     const requestBody = {
       messages: request.messages,
+      model, // Include model from auth.json
       temperature: request.temperature,
       max_tokens: request.maxTokens,
       stop_sequences: request.stopSequences,

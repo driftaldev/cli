@@ -5,7 +5,12 @@ import {
   type LLMGenerateResponse,
   type LLMStreamChunk,
 } from "../provider.js";
-import { loadAuthTokens, AuthTokens } from "../../../utils/token-manager.js";
+import {
+  loadAuthTokens,
+  AuthTokens,
+  isTokenExpired,
+} from "../../../utils/token-manager.js";
+import { refreshAccessToken } from "../../../utils/auth.js";
 import { logger } from "../../../utils/logger.js";
 
 const CLOUD_PROXY_URL =
@@ -40,6 +45,7 @@ export class CloudProxyProvider extends LLMProvider {
 
   /**
    * Load and validate authentication tokens
+   * Automatically refreshes tokens if they're expired or about to expire
    */
   private async ensureAuthenticated(): Promise<string> {
     // Load tokens if not cached
@@ -51,6 +57,37 @@ export class CloudProxyProvider extends LLMProvider {
       throw new Error(
         "Not authenticated. Please run 'driftal login' to authenticate."
       );
+    }
+
+    // Check if token is expired or about to expire
+    // If expiresAt is undefined, token never expires (persists until manual logout)
+    if (isTokenExpired(this.tokens)) {
+      // Try to refresh the token if we have a refresh token
+      if (this.tokens.refreshToken) {
+        logger.debug("Access token expired, attempting to refresh...");
+        try {
+          const refreshResult = await refreshAccessToken(
+            this.tokens.refreshToken
+          );
+          if (refreshResult.success && refreshResult.tokens) {
+            this.tokens = refreshResult.tokens;
+            logger.debug("Token refreshed successfully");
+          } else {
+            throw new Error(
+              "Failed to refresh token. Please run 'driftal login' to re-authenticate."
+            );
+          }
+        } catch (error) {
+          logger.error("Token refresh failed", error);
+          throw new Error(
+            "Token expired and refresh failed. Please run 'driftal login' to re-authenticate."
+          );
+        }
+      } else {
+        throw new Error(
+          "Token expired and no refresh token available. Please run 'driftal login' to re-authenticate."
+        );
+      }
     }
 
     return this.tokens.accessToken;
@@ -99,11 +136,75 @@ export class CloudProxyProvider extends LLMProvider {
 
       clearTimeout(timeoutId);
 
-      // Handle 401 - token might be invalid even after refresh
+      // Handle 401 - try to refresh token and retry once
       if (response.status === 401) {
-        throw new Error(
-          "Authentication failed. Please run 'driftal login' to re-authenticate."
-        );
+        // Try to refresh the token if we have a refresh token
+        if (this.tokens?.refreshToken) {
+          logger.debug(
+            "Received 401, attempting to refresh token and retry..."
+          );
+          try {
+            const refreshResult = await refreshAccessToken(
+              this.tokens.refreshToken
+            );
+            if (refreshResult.success && refreshResult.tokens) {
+              this.tokens = refreshResult.tokens;
+              logger.debug("Token refreshed, retrying request...");
+
+              // Retry the request with the new token
+              const retryResponse = await fetch(url, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${this.tokens.accessToken}`,
+                  "X-Scout-CLI-Version": "1.0.0",
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+              });
+
+              if (retryResponse.status === 401) {
+                throw new Error(
+                  "Authentication failed after token refresh. Please run 'driftal login' to re-authenticate."
+                );
+              }
+
+              if (!retryResponse.ok) {
+                const errorText = await retryResponse.text();
+                let errorMessage = `Cloud proxy error (${retryResponse.status})`;
+
+                try {
+                  const errorJson = JSON.parse(errorText);
+                  if (errorJson.error) {
+                    errorMessage = errorJson.error;
+                  }
+                } catch {
+                  errorMessage = errorText || errorMessage;
+                }
+
+                throw new Error(errorMessage);
+              }
+
+              return retryResponse;
+            } else {
+              throw new Error(
+                "Failed to refresh token. Please run 'driftal login' to re-authenticate."
+              );
+            }
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("refresh")) {
+              throw error;
+            }
+            logger.error("Token refresh failed", error);
+            throw new Error(
+              "Authentication failed. Please run 'driftal login' to re-authenticate."
+            );
+          }
+        } else {
+          throw new Error(
+            "Authentication failed. Please run 'driftal login' to re-authenticate."
+          );
+        }
       }
 
       // Handle other errors

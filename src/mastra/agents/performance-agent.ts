@@ -7,6 +7,7 @@ import { PerformanceContextStrategy } from '../../core/review/context-strategies
 import type { Stack } from '@/core/indexer/stack-detector.js';
 import { getStackSpecificInstructions } from './stack-prompts.js';
 import { logLLMResponseToFile } from '../workflows/review-workflow.js';
+import { parseJSONFromResponse } from '../utils/json-extractor.js';
 
 const PERFORMANCE_ANALYZER_INSTRUCTIONS = `You are a performance optimization expert with deep contextual understanding.
 
@@ -221,11 +222,10 @@ Return ONLY valid JSON with your findings.`;
     // Log LLM response to file
     await logLLMResponseToFile(context.fileName, "Performance", result.text);
 
-    // Parse the JSON response
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      logger.debug('[Performance Agent] Extracted JSON:', jsonMatch[0]);
-      const parsed = JSON.parse(jsonMatch[0]);
+    // Parse the JSON response using robust extraction
+    const parsed = parseJSONFromResponse(result.text);
+    if (parsed) {
+      logger.debug('[Performance Agent] Parsed JSON:', parsed);
       const issues = parsed.issues || [];
 
       // Ensure all issues have required fields with defaults
@@ -241,7 +241,7 @@ Return ONLY valid JSON with your findings.`;
       return normalizedIssues;
     }
 
-    logger.debug('[Performance Agent] No JSON found in response');
+    logger.debug('[Performance Agent] No valid JSON found in response');
     return [];
   } catch (error) {
     logger.error('Performance analysis failed:', error);

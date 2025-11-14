@@ -4,9 +4,9 @@ import { AuthTokens, saveAuthTokens, loadAuthTokens } from "./token-manager.js";
 import { logger } from "./logger.js";
 
 // Default auth endpoint - can be overridden via env var
-const AUTH_BASE_URL = process.env.SCOUT_AUTH_URL || "https://auth.driftal.dev";
-const AUTH_CLI_URL =
-  process.env.SCOUT_CLI_AUTH_URL || "https://auth.driftal.dev/cli/auth";
+const AUTH_BASE_URL =
+  process.env.DRIFTAL_AUTH_URL || "https://auth.driftal.dev";
+const AUTH_CLI_URL = `${process.env.DRIFTAL_AUTH_URL || "https://auth.driftal.dev"}/cli/auth`;
 
 function buildAuthApiUrl(path: string): string {
   return new URL(path, AUTH_BASE_URL).toString();
@@ -36,8 +36,8 @@ function openBrowser(url: string): void {
     process.platform === "darwin"
       ? "open"
       : process.platform === "win32"
-      ? "start"
-      : "xdg-open";
+        ? "start"
+        : "xdg-open";
 
   spawn(command, [url], {
     detached: true,
@@ -142,7 +142,22 @@ async function startCallbackServer(state: string): Promise<{
         });
 
         if (!tokenResponse.ok) {
-          throw new Error(`Token exchange failed: ${tokenResponse.statusText}`);
+          // Try to parse error response body for more details
+          let errorMessage = `Token exchange failed: ${tokenResponse.statusText}`;
+          try {
+            const errorData = (await tokenResponse.json()) as {
+              error?: string;
+              message?: string;
+            };
+            if (errorData.error) {
+              errorMessage = `Token exchange failed: ${errorData.error}`;
+            } else if (errorData.message) {
+              errorMessage = `Token exchange failed: ${errorData.message}`;
+            }
+          } catch {
+            // If parsing fails, use the status text
+          }
+          throw new Error(errorMessage);
         }
 
         const tokenData = (await tokenResponse.json()) as {
@@ -180,13 +195,19 @@ async function startCallbackServer(state: string): Promise<{
         server.close();
         settleResult({ success: true, tokens });
       } catch (error) {
-        logger.error("Token exchange error:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        logger.error("Token exchange error:", errorMessage);
+        if (error instanceof Error && error.stack) {
+          logger.debug("Token exchange error stack:", error.stack);
+        }
 
         res.writeHead(500, { "Content-Type": "text/html" });
         res.end(`
             <html>
               <body style="font-family: sans-serif; text-align: center; padding: 50px;">
                 <h1>❌ Token Exchange Failed</h1>
+                <p>${errorMessage}</p>
                 <p>Please try again or contact support.</p>
                 <p>You can close this window.</p>
               </body>
@@ -196,7 +217,7 @@ async function startCallbackServer(state: string): Promise<{
         server.close();
         settleResult({
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: errorMessage,
         });
       }
     } else {
@@ -231,15 +252,18 @@ async function startCallbackServer(state: string): Promise<{
   });
 
   // Timeout after 5 minutes
-  setTimeout(() => {
-    if (server.listening) {
-      server.close();
-    }
-    settleResult({
-      success: false,
-      error: "Authentication timeout - please try again",
-    });
-  }, 5 * 60 * 1000);
+  setTimeout(
+    () => {
+      if (server.listening) {
+        server.close();
+      }
+      settleResult({
+        success: false,
+        error: "Authentication timeout - please try again",
+      });
+    },
+    5 * 60 * 1000
+  );
 
   return { port, resultPromise };
 }

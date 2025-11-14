@@ -327,16 +327,12 @@ export function createReviewCommand(): Command {
         spinner.text = "Ensuring codebase is indexed...";
         const repoPath = process.cwd();
 
-        const indexDir = config.moss?.index_directory || ".driftal/indexes";
-        let mossClient: MossClient;
-        try {
-          mossClient = await MossClient.fromBackend(indexDir);
-        } catch (error) {
-          // Fallback to config/env if backend fetch fails
-          const projectId = config.moss?.project_id;
-          const projectKey = config.moss?.project_key;
-          mossClient = new MossClient(projectId, projectKey, indexDir);
-        }
+        // Initialize Moss client using credentials from config
+        const mossClient = new MossClient(
+          config.moss.project_id,
+          config.moss.project_key,
+          config.moss.index_directory
+        );
 
         // This will index if needed and start watching in background
         const repoName = await ensureIndexedAndWatching(

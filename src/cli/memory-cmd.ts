@@ -139,6 +139,7 @@ export function createMemoryCommand(): Command {
     .argument("<output>", "Output file path")
     .action(async (output) => {
       try {
+        if (!output.startsWith('/expected/path/') || output.includes('..')) { throw new Error('Invalid output path'); }
         const reviewMemory = new ReviewMemory();
         await reviewMemory.initialize();
 

@@ -1,102 +1,6 @@
 import { z } from "zod";
 
-export const RepoConfigSchema = z.object({
-  name: z.string(),
-  path: z.string(),
-  priority: z.enum(["low", "medium", "high"]).default("medium"),
-  watch: z.boolean().default(false)
-});
-
-export const CacheConfigSchema = z.object({
-  redis_url: z.string().url(),
-  default_ttl: z.number().int().positive().default(86400)
-});
-
-export const IndexerServiceSchema = z.object({
-  url: z.string().url(),
-  auto_start: z.boolean().default(true),
-  timeout: z.number().int().positive().default(100000000)
-});
-
-export const GitConfigSchema = z.object({
-  auto_index_on_commit: z.boolean().default(true)
-});
-
-export const IndexingConfigSchema = z.object({
-  file_extensions: z.array(z.string()),
-  exclude_patterns: z.array(z.string())
-});
-
-export const CloudConfigSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-    indexer_url: z.string().url().optional(),
-    redis_url: z.string().url().optional(),
-    api_key_env: z.string().min(1).optional(),
-    api_key: z.string().min(1).optional(),
-    api_key_file: z.string().min(1).optional(),
-    secrets_file: z.string().min(1).optional()
-  })
-  .superRefine((config, ctx) => {
-    if (!config.enabled) return;
-    if (!config.indexer_url) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "When cloud hosting is enabled, indexer_url must be provided"
-      });
-    }
-    if (!config.redis_url) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "When cloud hosting is enabled, redis_url must be provided"
-      });
-    }
-    const hasSecretConfig =
-      Boolean(config.api_key_env) ||
-      Boolean(config.api_key) ||
-      Boolean(config.api_key_file) ||
-      Boolean(config.secrets_file);
-    if (!hasSecretConfig) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "When cloud hosting is enabled, you must provide api_key_env, api_key, api_key_file, or secrets_file"
-      });
-    }
-
-    if (config.api_key && config.api_key_env) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "Specify either api_key or api_key_env (with optional file), but not both."
-      });
-    }
-
-    if (config.api_key && config.api_key_file) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "When api_key is provided inline, api_key_file should be omitted."
-      });
-    }
-
-    if (config.api_key && config.secrets_file) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "When api_key is provided inline, secrets_file should be omitted."
-      });
-    }
-
-    if (!config.api_key_env && (config.api_key_file || config.secrets_file)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "api_key_env is required when using api_key_file or secrets_file."
-      });
-    }
-  });
-
+// Simplified Moss configuration - credentials fetched from backend
 export const MossConfigSchema = z.object({
   index_directory: z.string().default(".driftal/indexes"),
   project_id: z.string(),
@@ -248,21 +152,14 @@ export const HyperspellConfigSchema = z.object({
   storageDir: z.string().default(".driftal/memory")
 });
 
+// Simplified Scout configuration - minimal fields needed
 export const ScoutConfigSchema = z.object({
-  version: z.number().int(),
-  indexer_service: IndexerServiceSchema,
-  repos: z.array(RepoConfigSchema),
-  cache: CacheConfigSchema,
-  git: GitConfigSchema,
-  indexing: IndexingConfigSchema,
-  cloud: CloudConfigSchema.default({ enabled: false }),
   moss: MossConfigSchema,
   llm: LLMConfigSchema.optional(),
   review: ReviewConfigSchema.optional(),
   hyperspell: HyperspellConfigSchema.optional()
 });
 
-export type CloudConfig = z.infer<typeof CloudConfigSchema>;
 export type CloudProxyConfig = z.infer<typeof CloudProxyConfigSchema>;
 export type MossConfig = z.infer<typeof MossConfigSchema>;
 export type LLMConfig = z.infer<typeof LLMConfigSchema>;

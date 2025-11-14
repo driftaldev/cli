@@ -129,17 +129,12 @@ export function registerIndexDocTool(
     async (params) => {
       const parsed = IndexDocInputSchema.parse(params ?? {});
 
-      // Initialize Moss client - try backend first, fallback to config/env
-      const indexDir = config.moss?.index_directory || ".driftal/indexes";
-      let client: MossClient;
-      try {
-        client = await MossClient.fromBackend(indexDir);
-      } catch (error) {
-        // Fallback to config/env if backend fetch fails
-        const projectId = config.moss?.project_id;
-        const projectKey = config.moss?.project_key;
-        client = new MossClient(projectId, projectKey, indexDir);
-      }
+      // Initialize Moss client using credentials from config
+      const client = new MossClient(
+        config.moss.project_id,
+        config.moss.project_key,
+        config.moss.index_directory
+      );
 
       // Crawl the URL to get content
       const document = await fetchSinglePage(parsed.url);

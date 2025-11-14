@@ -51,19 +51,22 @@ export class ContextEnricher {
   }
 
   /**
-   * Lazy initialization of MossClient - tries backend first, falls back to env
+   * Lazy initialization of MossClient - loads credentials from backend
    */
   private async getMossClient(): Promise<MossClient> {
     if (this.mossClient) {
       return this.mossClient;
     }
 
-    try {
-      this.mossClient = await MossClient.fromBackend();
-    } catch (error) {
-      // Fallback to env/config if backend fetch fails
-      this.mossClient = new MossClient();
-    }
+    // Load config (which fetches credentials from backend)
+    const { loadConfig } = await import('../../config/loader.js');
+    const config = await loadConfig();
+
+    this.mossClient = new MossClient(
+      config.moss.project_id,
+      config.moss.project_key,
+      config.moss.index_directory
+    );
 
     return this.mossClient;
   }

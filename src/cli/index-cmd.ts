@@ -5,6 +5,7 @@ import chokidar from "chokidar";
 import ora from "ora";
 
 import { loadConfig, type ScoutConfig } from "../config/loader.js";
+import { DEFAULT_FILE_EXTENSIONS, DEFAULT_EXCLUDE_PATTERNS } from "../config/constants.js";
 import { scanFiles } from "../core/indexer/file-scanner.js";
 import {
   type FullIndexRequest,
@@ -174,14 +175,14 @@ export async function ensureIndexedAndWatching(
 
   // Check if already indexed
   const isIndexed = await client.isIndexed(repoName);
-  
+
   if (!isIndexed) {
     logger.info(`Index not found for ${repoName}. Auto-indexing...`);
     await performIndex(
       repoName,
       repoPath,
-      config.indexing.file_extensions,
-      config.indexing.exclude_patterns,
+      DEFAULT_FILE_EXTENSIONS,
+      DEFAULT_EXCLUDE_PATTERNS,
       client
     );
   } else {
@@ -192,8 +193,8 @@ export async function ensureIndexedAndWatching(
   setupWatcher({
     repoName,
     root: repoPath,
-    extensions: config.indexing.file_extensions,
-    excludePatterns: config.indexing.exclude_patterns,
+    extensions: DEFAULT_FILE_EXTENSIONS,
+    excludePatterns: DEFAULT_EXCLUDE_PATTERNS,
     client
   });
 
@@ -203,56 +204,41 @@ export async function ensureIndexedAndWatching(
 export function registerIndexCommand(program: Command): void {
   program
     .command("index")
-    .description("Index configured repositories")
+    .description("Index current repository")
     .option("--full", "Perform a full re-index", false)
     .option("--watch", "Watch for file changes", false)
     .action(async (options) => {
       const config = await loadConfig();
-      const commandRepoRoot = process.env.INIT_CWD ?? process.cwd();
+      const repoRoot = process.env.INIT_CWD ?? process.cwd();
 
-      // Initialize Moss client - try backend first, fallback to config/env
-      const indexDir = config.moss?.index_directory || ".driftal/indexes";
-      let client: MossClient;
-      try {
-        client = await MossClient.fromBackend(indexDir);
-      } catch (error) {
-        // Fallback to config/env if backend fetch fails
-        const projectId = config.moss?.project_id;
-        const projectKey = config.moss?.project_key;
-        client = new MossClient(projectId, projectKey, indexDir);
-      }
+      // Initialize Moss client using credentials from config
+      const client = new MossClient(
+        config.moss.project_id,
+        config.moss.project_key,
+        config.moss.index_directory
+      );
 
-      const repoContexts: Array<{
-        config: (typeof config.repos)[number];
-        repoRoot: string;
-        repoName: string;
-      }> = [];
+      // Get or prompt for repo name
+      const repoName = await promptRepoName(repoRoot);
 
-      for (const repo of config.repos) {
-        const repoRoot = commandRepoRoot;
-        const repoName = await promptRepoName(repoRoot);
+      // Perform indexing
+      await performIndex(
+        repoName,
+        repoRoot,
+        DEFAULT_FILE_EXTENSIONS,
+        DEFAULT_EXCLUDE_PATTERNS,
+        client
+      );
 
-        repoContexts.push({ config: repo, repoRoot, repoName });
-
-        await performIndex(
-          repoName,
-          repoRoot,
-          config.indexing.file_extensions,
-          config.indexing.exclude_patterns,
-          client
-        );
-      }
-
+      // Setup watcher if requested
       if (options.watch) {
-        for (const ctx of repoContexts.filter(({ config }) => config.watch)) {
-          setupWatcher({
-            repoName: ctx.repoName,
-            root: ctx.repoRoot,
-            extensions: config.indexing.file_extensions,
-            excludePatterns: config.indexing.exclude_patterns,
-            client
-          });
-        }
+        setupWatcher({
+          repoName,
+          root: repoRoot,
+          extensions: DEFAULT_FILE_EXTENSIONS,
+          excludePatterns: DEFAULT_EXCLUDE_PATTERNS,
+          client
+        });
       }
     });
 }

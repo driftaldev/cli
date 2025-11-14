@@ -195,23 +195,12 @@ export function registerChatCommand(program: Command): void {
         const config = await loadConfig();
         const repoRoot = process.cwd();
 
-        // Initialize Moss client - try backend first, fallback to config/env
-        const indexDir = config.moss?.index_directory || ".driftal/indexes";
-        let client: MossClient;
-        try {
-          client = await MossClient.fromBackend(indexDir);
-        } catch (error) {
-          // Fallback to config/env if backend fetch fails
-          const projectId = config.moss?.project_id;
-          const projectKey = config.moss?.project_key;
-          try {
-            client = new MossClient(projectId, projectKey, indexDir);
-          } catch (fallbackError) {
-            logger.error((fallbackError as Error).message);
-            process.exitCode = 1;
-            return;
-          }
-        }
+        // Initialize Moss client using credentials from config
+        const client = new MossClient(
+          config.moss.project_id,
+          config.moss.project_key,
+          config.moss.index_directory
+        );
 
         // Auto-index and start watcher if needed
         const repoName = await ensureIndexedAndWatching(

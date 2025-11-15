@@ -224,7 +224,7 @@ Return ONLY valid JSON with your findings.`;
     const result = await agent.generate(prompt, {
       structuredOutput: {
         schema: PerformanceIssuesResponseSchema,
-        errorStrategy: "warn",
+        errorStrategy: "strict",
       },
     });
 
@@ -255,9 +255,19 @@ Return ONLY valid JSON with your findings.`;
 
     logger.debug("[Performance Agent] No issues found in structured output");
     return [];
-  } catch (error) {
-    logger.error("Performance analysis failed:", error);
-    logger.debug("[Performance Agent] Error details:", error);
+  } catch (error: any) {
+    // Check if this is a structured output validation error
+    if (error?.message?.includes("Structured output validation failed")) {
+      logger.warn(
+        `[Performance Agent] Structured output validation failed for ${context.fileName}. ` +
+          `This usually happens when the file is too large or complex. ` +
+          `The LLM returned malformed JSON that doesn't match the expected schema.`
+      );
+      logger.debug("[Performance Agent] Validation error details:", error);
+    } else {
+      logger.error("Performance analysis failed:", error);
+      logger.debug("[Performance Agent] Error details:", error);
+    }
     return [];
   }
 }

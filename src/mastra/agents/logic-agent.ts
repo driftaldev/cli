@@ -230,7 +230,7 @@ Return ONLY valid JSON with your findings.`;
     const result = await agent.generate(prompt, {
       structuredOutput: {
         schema: LogicIssuesResponseSchema,
-        errorStrategy: "warn",
+        errorStrategy: "strict",
       },
     });
 
@@ -258,9 +258,19 @@ Return ONLY valid JSON with your findings.`;
 
     logger.debug("[Logic Agent] No issues found in structured output");
     return [];
-  } catch (error) {
-    logger.error("Logic analysis failed:", error);
-    logger.debug("[Logic Agent] Error details:", error);
+  } catch (error: any) {
+    // Check if this is a structured output validation error
+    if (error?.message?.includes("Structured output validation failed")) {
+      logger.warn(
+        `[Logic Agent] Structured output validation failed for ${context.fileName}. ` +
+          `This usually happens when the file is too large or complex. ` +
+          `The LLM returned malformed JSON that doesn't match the expected schema.`
+      );
+      logger.debug("[Logic Agent] Validation error details:", error);
+    } else {
+      logger.error("Logic analysis failed:", error);
+      logger.debug("[Logic Agent] Error details:", error);
+    }
     return [];
   }
 }

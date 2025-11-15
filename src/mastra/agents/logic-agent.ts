@@ -7,7 +7,7 @@ import { LogicContextStrategy } from "../../core/review/context-strategies.js";
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
-import { parseJSONFromResponse } from "../utils/json-extractor.js";
+import { LogicIssuesResponseSchema } from "../schemas/issue-schema.js";
 
 const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
 
@@ -228,7 +228,10 @@ Return ONLY valid JSON with your findings.`;
 
   try {
     const result = await agent.generate(prompt, {
-      maxSteps: 3, // Allow tool use
+      structuredOutput: {
+        schema: LogicIssuesResponseSchema,
+        errorStrategy: "warn",
+      },
     });
 
     logger.debug("[Logic Agent] Raw LLM response:", result.text);
@@ -236,11 +239,9 @@ Return ONLY valid JSON with your findings.`;
     // Log LLM response to file
     await logLLMResponseToFile(context.fileName, "Logic", result.text);
 
-    // Parse the JSON response using robust extraction
-    const parsed = parseJSONFromResponse(result.text);
-    if (parsed) {
-      logger.debug("[Logic Agent] Parsed JSON:", parsed);
-      const issues = parsed.issues || [];
+    // Access structured output directly from result.object
+    if (result.object && result.object.issues) {
+      const issues = result.object.issues;
 
       // Ensure all issues have required fields with defaults
       const normalizedIssues = issues.map((issue: any) => ({
@@ -251,11 +252,11 @@ Return ONLY valid JSON with your findings.`;
         tags: issue.tags || [],
       }));
 
-      logger.debug("[Logic Agent] Parsed issues:", normalizedIssues);
+      logger.debug("[Logic Agent] Structured output issues:", normalizedIssues);
       return normalizedIssues;
     }
 
-    logger.debug("[Logic Agent] No valid JSON found in response");
+    logger.debug("[Logic Agent] No issues found in structured output");
     return [];
   } catch (error) {
     logger.error("Logic analysis failed:", error);

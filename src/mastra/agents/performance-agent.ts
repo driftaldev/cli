@@ -227,6 +227,9 @@ Return ONLY valid JSON with your findings.`;
         errorStrategy: "warn",
         jsonPromptInjection: true,
       },
+      modelSettings: {
+        temperature: 1,
+      },
     });
 
     logger.debug("[Performance Agent] Raw LLM response:", result.text);

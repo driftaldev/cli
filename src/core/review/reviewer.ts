@@ -3,14 +3,17 @@ import type { LLMConfig, ReviewConfig } from "../../config/schema.js";
 import type { ReviewContext } from "../llm/prompts/review-templates.js";
 import { type ReviewResults, IssueRanker } from "./issue.js";
 import { ChangeAnalyzer } from "./change-analyzer.js";
-import { MastraReviewOrchestrator, createMastraOrchestrator } from "../../mastra/index.js";
+import {
+  MastraReviewOrchestrator,
+  createMastraOrchestrator,
+} from "../../mastra/index.js";
 import { ContextEnricher } from "./context-enricher.js";
 import { loadSavedRepoName } from "../../utils/repo-name-store.js";
 import { detectStacks } from "../indexer/stack-detector.js";
 import { logger } from "../../utils/logger.js";
 
 export interface ReviewOptions {
-  severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  severity?: "critical" | "high" | "medium" | "low" | "info";
   analyzers?: string[];
   quick?: boolean;
   verbose?: boolean;
@@ -46,12 +49,14 @@ export class CodeReviewer {
       this.mastraOrchestrator = await createMastraOrchestrator({
         llmConfig: this.llmConfig,
         memory: this.reviewConfig.mastra?.memory,
-        stacks
+        stacks,
       });
       this.mastraInitialized = true;
     } catch (error) {
-      logger.error('Failed to initialize Mastra:', error);
-      throw new Error('Mastra initialization failed. Cannot proceed with review.');
+      logger.error("Failed to initialize Mastra:", error);
+      throw new Error(
+        "Mastra initialization failed. Cannot proceed with review."
+      );
     }
   }
 
@@ -70,7 +75,7 @@ export class CodeReviewer {
     await this.initializeMastra();
 
     if (!this.mastraOrchestrator) {
-      throw new Error('Failed to initialize Mastra orchestrator');
+      throw new Error("Failed to initialize Mastra orchestrator");
     }
 
     // Initialize context enricher
@@ -82,7 +87,7 @@ export class CodeReviewer {
         repoPath,
         repoName,
         maxSimilarPatterns: 5,
-        maxImportDepth: 2,
+        maxImportDepth: 1, // Reduced from 2: depth 1 with full content is optimal for cost/benefit
         includeTests: true,
       });
     }
@@ -103,13 +108,13 @@ export class CodeReviewer {
         onProgress,
         options: {
           minConfidence: 0.5,
-          severityFilter: options.severity
-        }
-      }
+          severityFilter: options.severity,
+        },
+      },
     });
 
-    if (execution.status !== 'success' || !execution.result) {
-      throw new Error('Mastra review workflow did not complete successfully');
+    if (execution.status !== "success" || !execution.result) {
+      throw new Error("Mastra review workflow did not complete successfully");
     }
 
     const workflowResult = execution.result;
@@ -120,15 +125,15 @@ export class CodeReviewer {
         analysis = await this.changeAnalyzer.analyze(diff);
       } catch {
         analysis = {
-          type: 'unknown',
-          complexity: 'unknown',
+          type: "unknown",
+          complexity: "unknown",
           riskScore: 0,
           affectedModules: [],
           testCoverage: false,
           breakingChange: false,
           filesChanged: diff.files.length,
           linesAdded: diff.stats.additions,
-          linesRemoved: diff.stats.deletions
+          linesRemoved: diff.stats.deletions,
         } as any;
       }
     }
@@ -146,7 +151,7 @@ export class CodeReviewer {
     const totalTokens = workflowResult.totalTokens ?? 0;
 
     // Get model from config
-    const model = this.llmConfig.model || 'claude-3-5-sonnet-20241022';
+    const model = this.llmConfig.model || "claude-3-5-sonnet-20241022";
 
     const results: ReviewResults = {
       issues,
@@ -154,27 +159,34 @@ export class CodeReviewer {
       timestamp: Date.now(),
       duration,
       analysis: {
-        type: (analysis as any).type ?? 'unknown',
-        complexity: (analysis as any).complexity ?? 'unknown',
+        type: (analysis as any).type ?? "unknown",
+        complexity: (analysis as any).complexity ?? "unknown",
         riskScore: (analysis as any).riskScore ?? 0,
         affectedModules: (analysis as any).affectedModules ?? [],
         testCoverage: (analysis as any).testCoverage ?? false,
         breakingChange: (analysis as any).breakingChange ?? false,
         filesChanged: (analysis as any).filesChanged ?? diff.files.length,
         linesAdded: (analysis as any).linesAdded ?? diff.stats.additions,
-        linesRemoved: (analysis as any).linesRemoved ?? diff.stats.deletions
+        linesRemoved: (analysis as any).linesRemoved ?? diff.stats.deletions,
       },
       // Metadata for backend logging
       totalTokens,
       linesOfCodeReviewed,
       model,
-      repositoryName: repoName || undefined
+      repositoryName: repoName || undefined,
     };
 
     // Store in memory if enabled
-    if (this.reviewConfig.memory?.enabled && this.reviewConfig.memory.learnFromFeedback) {
+    if (
+      this.reviewConfig.memory?.enabled &&
+      this.reviewConfig.memory.learnFromFeedback
+    ) {
       const memory = this.mastraOrchestrator.getMemory();
-      await memory.storeReview(results, process.cwd(), diff.files[0]?.path || 'unknown');
+      await memory.storeReview(
+        results,
+        process.cwd(),
+        diff.files[0]?.path || "unknown"
+      );
     }
 
     return results;
@@ -186,5 +198,4 @@ export class CodeReviewer {
   getMemory() {
     return this.mastraOrchestrator?.getMemory();
   }
-
 }

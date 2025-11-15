@@ -8,12 +8,163 @@ import path from "path";
 import { logger } from "../../utils/logger";
 import { MossClient } from "../indexer/moss-client.js";
 
+/**
+ * Log import resolution details to debug folder
+ */
+async function logImportResolutionToFile(
+  filePath: string,
+  resolutionDetails: {
+    totalImports: number;
+    resolvedImports: Array<{
+      import: string;
+      basePath: string;
+      resolvedPath: string | null;
+      success: boolean;
+    }>;
+    extensions: string[];
+    repoName: string;
+  }
+): Promise<void> {
+  // Only log when DRIFTAL_DEBUG=1 is set
+  if (process.env.DRIFTAL_DEBUG !== "1") {
+    return;
+  }
+
+  try {
+    // Get the working directory (where CLI is run from)
+    const workingDir = process.cwd();
+    const resolutionsDir = path.join(
+      workingDir,
+      ".driftal",
+      "debug",
+      "resolutions"
+    );
+
+    // Ensure .driftal/debug/resolutions directory exists
+    await fs.mkdir(resolutionsDir, { recursive: true });
+
+    // Create filename: <filename>_import_resolutions.txt
+    const baseFileName = path.basename(filePath).replace(/\//g, "_");
+    const logFileName = `${baseFileName}_import_resolutions.txt`;
+    const logFilePath = path.join(resolutionsDir, logFileName);
+
+    // Format the resolution details for logging
+    const successfulResolutions = resolutionDetails.resolvedImports.filter(
+      (r) => r.success
+    );
+    const failedResolutions = resolutionDetails.resolvedImports.filter(
+      (r) => !r.success
+    );
+
+    const logContent = `
+================================================================================
+IMPORT RESOLUTION LOG FOR FILE: ${filePath}
+TIMESTAMP: ${new Date().toISOString()}
+================================================================================
+
+REPOSITORY: ${resolutionDetails.repoName}
+TOTAL IMPORTS: ${resolutionDetails.totalImports}
+RESOLVED: ${successfulResolutions.length}
+FAILED: ${failedResolutions.length}
+FILE EXTENSIONS USED: ${resolutionDetails.extensions.join(", ")}
+
+================================================================================
+SUCCESSFUL RESOLUTIONS (${successfulResolutions.length}):
+================================================================================
+${
+  successfulResolutions.length > 0
+    ? successfulResolutions
+        .map(
+          (r, idx) =>
+            `
+[${idx + 1}] Import: "${r.import}"
+    → Base Path: "${r.basePath}"
+    → Resolved To: "${r.resolvedPath}"
+    ✓ SUCCESS
+`
+        )
+        .join("\n")
+    : "None"
+}
+
+================================================================================
+FAILED RESOLUTIONS (${failedResolutions.length}):
+================================================================================
+${
+  failedResolutions.length > 0
+    ? failedResolutions
+        .map(
+          (r, idx) =>
+            `
+[${idx + 1}] Import: "${r.import}"
+    → Base Path: "${r.basePath}"
+    → Moss returned: null
+    ✗ FAILED (likely external package or file not indexed)
+`
+        )
+        .join("\n")
+    : "None"
+}
+
+================================================================================
+DETAILED IMPORT RESOLUTION ATTEMPTS:
+================================================================================
+${resolutionDetails.resolvedImports
+  .map(
+    (r, idx) =>
+      `
+[${idx + 1}/${resolutionDetails.totalImports}] "${r.import}"
+  Step 1: Extract base path from import
+          → Result: "${r.basePath}"
+  
+  Step 2: Strip file extensions (if any)
+          → Base path after stripping: "${r.basePath}"
+  
+  Step 3: Call Moss.findIndexedFile()
+          → Repository: "${resolutionDetails.repoName}"
+          → Base Path: "${r.basePath}"
+          → Extensions to try: [${resolutionDetails.extensions.join(", ")}]
+  
+  Step 4: Moss lookup result
+          → ${r.success ? `✓ FOUND: "${r.resolvedPath}"` : "✗ NOT FOUND (returned null)"}
+  
+  Final Status: ${r.success ? "✅ RESOLVED" : "❌ UNRESOLVED"}
+`
+  )
+  .join("\n" + "=".repeat(80) + "\n")}
+
+================================================================================
+SUMMARY:
+================================================================================
+Success Rate: ${resolutionDetails.totalImports > 0 ? ((successfulResolutions.length / resolutionDetails.totalImports) * 100).toFixed(1) : 0}%
+Total Imports Analyzed: ${resolutionDetails.totalImports}
+Successfully Resolved: ${successfulResolutions.length}
+Failed to Resolve: ${failedResolutions.length}
+
+Note: Failed resolutions are usually external packages (npm, pip, etc.) which are
+      expected and don't indicate a problem with the import resolution system.
+
+================================================================================
+END OF IMPORT RESOLUTION LOG
+================================================================================
+`;
+
+    // Write to file
+    await fs.writeFile(logFilePath, logContent, "utf-8");
+    logger.debug(`[ImportResolution] Log written to: ${logFilePath}`);
+  } catch (error) {
+    logger.error(`[ImportResolution] Failed to log import resolutions:`, error);
+  }
+}
+
 export interface DependencyNode {
   filePath: string;
   imports: string[]; // Resolved file paths
   exports: string[]; // Export names
   depth: number;
   relationship: "upstream" | "downstream" | "self";
+  content?: string; // Full file content for LLM context
+  relevantDefinitions?: string; // Extracted function/class signatures
 }
 
 export interface TestFile {
@@ -152,6 +303,123 @@ export class DependencyGraphBuilder {
   }
 
   /**
+   * Public method to resolve a single import path
+   * Used by Context Enricher to resolve imports using Moss
+   */
+  async resolveImport(
+    importPath: string,
+    fromFile: string
+  ): Promise<string | null> {
+    try {
+      const basePath = this.extractBasePathFromImport(importPath, fromFile);
+      const extensions = this.getExtensionsForFile(fromFile);
+
+      const resolvedPath = await this.mossClient.findIndexedFile(
+        this.repoName,
+        basePath,
+        extensions
+      );
+
+      if (resolvedPath) {
+        // Convert relative path to absolute
+        return path.resolve(this.repoPath, resolvedPath);
+      }
+
+      return null;
+    } catch (error) {
+      logger.debug(
+        `[DependencyGraph] Error resolving import "${importPath}":`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Extract function and class signatures from file content
+   * Provides lightweight context about what's defined in a dependency
+   */
+  private extractFunctionSignatures(content: string): string {
+    const signatures: string[] = [];
+
+    // Extract function declarations (with types if TypeScript)
+    const functionRegex =
+      /(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*(<[^>]+>)?\s*\(([^)]*)\)\s*(?::\s*([^{]+))?\s*{/g;
+    let match;
+
+    while ((match = functionRegex.exec(content)) !== null) {
+      const name = match[1];
+      const generics = match[2] || "";
+      const params = match[3];
+      const returnType = match[4]?.trim() || "";
+      const isAsync = content
+        .substring(Math.max(0, match.index - 10), match.index)
+        .includes("async");
+
+      signatures.push(
+        `${isAsync ? "async " : ""}function ${name}${generics}(${params})${returnType ? `: ${returnType}` : ""}`
+      );
+    }
+
+    // Extract arrow function assignments
+    const arrowRegex =
+      /(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(async\s+)?\(([^)]*)\)\s*(?::\s*([^=]+))?\s*=>/g;
+    while ((match = arrowRegex.exec(content)) !== null) {
+      const name = match[1];
+      const isAsync = !!match[2];
+      const params = match[3];
+      const returnType = match[4]?.trim() || "";
+
+      signatures.push(
+        `${isAsync ? "async " : ""}const ${name} = (${params})${returnType ? `: ${returnType}` : ""} =>`
+      );
+    }
+
+    // Extract class declarations
+    const classRegex =
+      /(?:export\s+)?class\s+(\w+)(?:<([^>]+)>)?\s*(?:extends\s+(\w+))?\s*(?:implements\s+([\w,\s]+))?\s*{/g;
+    while ((match = classRegex.exec(content)) !== null) {
+      const name = match[1];
+      const generics = match[2] ? `<${match[2]}>` : "";
+      const extendsClause = match[3] ? ` extends ${match[3]}` : "";
+      const implementsClause = match[4] ? ` implements ${match[4]}` : "";
+
+      signatures.push(
+        `class ${name}${generics}${extendsClause}${implementsClause}`
+      );
+    }
+
+    // Extract interface declarations
+    const interfaceRegex =
+      /(?:export\s+)?interface\s+(\w+)(?:<([^>]+)>)?\s*(?:extends\s+([\w,\s]+))?\s*{/g;
+    while ((match = interfaceRegex.exec(content)) !== null) {
+      const name = match[1];
+      const generics = match[2] ? `<${match[2]}>` : "";
+      const extendsClause = match[3] ? ` extends ${match[3]}` : "";
+
+      signatures.push(`interface ${name}${generics}${extendsClause}`);
+    }
+
+    // Extract type aliases
+    const typeRegex =
+      /(?:export\s+)?type\s+(\w+)(?:<([^>]+)>)?\s*=\s*([^;]+);?/g;
+    while ((match = typeRegex.exec(content)) !== null) {
+      const name = match[1];
+      const generics = match[2] ? `<${match[2]}>` : "";
+      const definition = match[3].trim();
+
+      // Truncate long type definitions
+      const truncated =
+        definition.length > 100
+          ? definition.substring(0, 100) + "..."
+          : definition;
+      signatures.push(`type ${name}${generics} = ${truncated}`);
+    }
+
+    return signatures.slice(0, 20).join("\n"); // Limit to top 20 signatures
+  }
+
+  /**
    * Get upstream dependencies (files this imports from)
    */
   private async getUpstreamDependencies(
@@ -172,10 +440,12 @@ export class DependencyGraphBuilder {
       try {
         const content = await this.readFile(currentPath);
         const imports = this.extractImports(content, currentPath);
+        // Only log import resolution for the root file (depth 0)
         const resolvedImports = await this.resolveImports(
           imports,
           currentPath,
-          includeNodeModules
+          includeNodeModules,
+          depth === 0 // shouldLog: true for root file, false for dependencies
         );
 
         if (depth > 0) {
@@ -185,6 +455,8 @@ export class DependencyGraphBuilder {
             exports: this.extractExports(content),
             depth,
             relationship: "upstream",
+            content: content, // Include full content for LLM
+            relevantDefinitions: this.extractFunctionSignatures(content), // Include signatures
           });
         }
 
@@ -240,7 +512,8 @@ export class DependencyGraphBuilder {
             const resolvedImports = await this.resolveImports(
               imports,
               file,
-              false
+              false,
+              false // Don't log for downstream dependency checks
             );
 
             const importsTargetFile = resolvedImports.some(
@@ -387,10 +660,13 @@ export class DependencyGraphBuilder {
 
   /**
    * Extract base path from import for Moss lookup
+   * Strips any existing file extensions to allow Moss to match with actual source file extensions
+   *
    * Examples:
-   *   "@/services/wallet.service" → "services/wallet.service"
-   *   "./utils/helper" → "utils/helper" (relative from current dir)
-   *   "../../core/types" → "core/types" (resolved relative path)
+   *   TypeScript: "../services/wallet.service.js" → "services/wallet.service" (will match .ts/.tsx)
+   *   Python: "foo.bar.baz" → "foo/bar/baz" (module path, not file extension)
+   *   Go: "./utils" → "utils" (package import)
+   *   Rust: "crate::services::auth" → handled separately
    */
   private extractBasePathFromImport(
     importPath: string,
@@ -398,18 +674,111 @@ export class DependencyGraphBuilder {
   ): string {
     // Remove leading @ and slash for path aliases
     if (importPath.startsWith("@/")) {
-      return importPath.substring(2);
+      const basePath = importPath.substring(2);
+      // Strip any file extension from path alias imports
+      return this.stripSourceFileExtension(basePath);
     }
 
     // For relative imports, resolve them relative to the importing file
     if (importPath.startsWith("./") || importPath.startsWith("../")) {
       const fromDir = path.dirname(fromFile);
       const resolvedPath = path.resolve(fromDir, importPath);
-      return path.relative(this.repoPath, resolvedPath);
+      let relativePath = path.relative(this.repoPath, resolvedPath);
+
+      // Strip file extension to allow Moss to match with any source extension
+      // This handles cases like: import { foo } from './bar.js' → matches bar.ts
+      relativePath = this.stripSourceFileExtension(relativePath);
+
+      return relativePath;
     }
 
     // Absolute or package imports - return as-is
     return importPath;
+  }
+
+  /**
+   * Strip source file extensions from paths
+   * Handles: .js, .jsx, .ts, .tsx, .mjs, .cjs, .py, .go, .rs, etc.
+   */
+  private stripSourceFileExtension(filePath: string): string {
+    const ext = path.extname(filePath);
+    const sourceExtensions = [
+      ".js",
+      ".jsx",
+      ".ts",
+      ".tsx",
+      ".mjs",
+      ".cjs", // JavaScript/TypeScript
+      ".py", // Python
+      ".go", // Go
+      ".rs", // Rust
+      ".java",
+      ".kt",
+      ".swift",
+      ".rb",
+      ".php", // Other languages
+    ];
+
+    if (ext && sourceExtensions.includes(ext)) {
+      return filePath.slice(0, -ext.length);
+    }
+
+    return filePath;
+  }
+
+  /**
+   * Get appropriate file extensions based on source file language
+   */
+  private getExtensionsForFile(filePath: string): string[] {
+    const ext = path.extname(filePath);
+
+    // TypeScript/JavaScript files
+    if ([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"].includes(ext)) {
+      return [".ts", ".tsx", ".js", ".jsx"];
+    }
+
+    // Python files
+    if (ext === ".py") {
+      return [".py"];
+    }
+
+    // Go files
+    if (ext === ".go") {
+      return [".go"];
+    }
+
+    // Rust files
+    if (ext === ".rs") {
+      return [".rs"];
+    }
+
+    // Java
+    if (ext === ".java") {
+      return [".java"];
+    }
+
+    // Kotlin
+    if (ext === ".kt") {
+      return [".kt"];
+    }
+
+    // Ruby
+    if (ext === ".rb") {
+      return [".rb"];
+    }
+
+    // PHP
+    if (ext === ".php") {
+      return [".php"];
+    }
+
+    // Swift
+    if (ext === ".swift") {
+      return [".swift"];
+    }
+
+    // Default to JS/TS
+    return [".ts", ".tsx", ".js", ".jsx"];
   }
 
   /**
@@ -418,7 +787,8 @@ export class DependencyGraphBuilder {
   private async resolveImports(
     imports: string[],
     fromFile: string,
-    includeNodeModules: boolean
+    includeNodeModules: boolean,
+    shouldLog: boolean = false
   ): Promise<Array<{ importPath: string; resolvedPath: string }>> {
     // Filter imports based on includeNodeModules
     const localImports = imports.filter((imp) => {
@@ -438,10 +808,23 @@ export class DependencyGraphBuilder {
       `[DependencyGraph] Total imports to resolve: ${localImports.length}`
     );
 
+    // Get appropriate extensions based on the source file type
+    const extensions = this.getExtensionsForFile(fromFile);
+    logger.debug(
+      `[DependencyGraph] Using extensions: ${extensions.join(", ")} for ${fromFile}`
+    );
+
+    // Track resolution details for logging
+    const resolutionDetails: Array<{
+      import: string;
+      basePath: string;
+      resolvedPath: string | null;
+      success: boolean;
+    }> = [];
+
     // Resolve ALL imports in parallel using Promise.all
     const resolvePromises = localImports.map(async (imp, index) => {
       const basePath = this.extractBasePathFromImport(imp, fromFile);
-      const extensions = [".ts", ".tsx", ".js", ".jsx"];
 
       logger.info(
         `[DependencyGraph] [${index + 1}/${localImports.length}] Resolving import: "${imp}"`
@@ -467,10 +850,28 @@ export class DependencyGraphBuilder {
         logger.info(
           `[DependencyGraph]   ✓ SUCCESS: "${imp}" → "${absolutePath}"`
         );
+
+        // Track resolution for logging
+        resolutionDetails.push({
+          import: imp,
+          basePath,
+          resolvedPath: absolutePath,
+          success: true,
+        });
+
         return { importPath: imp, resolvedPath: absolutePath };
       }
 
       logger.info(`[DependencyGraph]   ✗ FAILED: Could not resolve "${imp}"`);
+
+      // Track failed resolution for logging
+      resolutionDetails.push({
+        import: imp,
+        basePath,
+        resolvedPath: null,
+        success: false,
+      });
+
       return null;
     });
 
@@ -479,13 +880,21 @@ export class DependencyGraphBuilder {
       (r): r is { importPath: string; resolvedPath: string } => r !== null
     );
 
-    logger.info(
-      `[DependencyGraph] ===== MOSS RESOLUTION SUMMARY =====`
-    );
+    logger.info(`[DependencyGraph] ===== MOSS RESOLUTION SUMMARY =====`);
     logger.info(
       `[DependencyGraph] Total: ${localImports.length} | Resolved: ${resolved.length} | Failed: ${localImports.length - resolved.length}`
     );
     logger.info(`[DependencyGraph] ===== END MOSS RESOLUTION =====`);
+
+    // Log detailed import resolution to file (only for root file in debug mode)
+    if (shouldLog) {
+      await logImportResolutionToFile(fromFile, {
+        totalImports: localImports.length,
+        resolvedImports: resolutionDetails,
+        extensions,
+        repoName: this.repoName,
+      });
+    }
 
     return resolved;
   }

@@ -230,7 +230,8 @@ Return ONLY valid JSON with your findings.`;
     const result = await agent.generate(prompt, {
       structuredOutput: {
         schema: LogicIssuesResponseSchema,
-        errorStrategy: "strict",
+        errorStrategy: "warn",
+        jsonPromptInjection: true,
       },
     });
 

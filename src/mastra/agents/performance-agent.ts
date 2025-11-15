@@ -224,7 +224,8 @@ Return ONLY valid JSON with your findings.`;
     const result = await agent.generate(prompt, {
       structuredOutput: {
         schema: PerformanceIssuesResponseSchema,
-        errorStrategy: "strict",
+        errorStrategy: "warn",
+        jsonPromptInjection: true,
       },
     });
 

@@ -111,11 +111,11 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text color="cyanBright">Scout Review Summary</Text>
+      <Text color="cyanBright">Here's what Driftal found...</Text>
       <Box marginTop={1} flexDirection="column">
         {groupedIssues.length === 0 ? (
           <Box marginTop={1}>
-            <Text color="green">No issues found! 🎉</Text>
+            <Text color="green">No issues found</Text>
           </Box>
         ) : (
           groupedIssues.map(({ severity, issue }) => {

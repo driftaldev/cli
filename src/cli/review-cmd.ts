@@ -442,7 +442,7 @@ export function createReviewCommand(): Command {
           mossClient
         );
 
-        spinner.succeed(`Codebase indexed and watching for changes`);
+        // spinner.succeed(`Codebase indexed and watching for changes`);
 
         // Ensure review config exists with defaults
         const reviewConfig: ReviewConfig = {
@@ -496,7 +496,7 @@ export function createReviewCommand(): Command {
           spinner.stop();
           selectedFiles = await selectFiles(
             repoPath,
-            "Select files to review (space to toggle, enter to confirm all)"
+            "Select files to review (search across all files)"
           );
           spinner.start("Analyzing changes...");
         } else if (files.length > 0) {

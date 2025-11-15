@@ -105,9 +105,6 @@ export function isTokenExpired(tokens: AuthTokens): boolean {
 
   if (isExpired) {
     const expiresAtDate = new Date(tokens.expiresAt);
-    console.log(
-      `Token expired or expiring soon. Expires at: ${expiresAtDate.toISOString()}`
-    );
   }
 
   return isExpired;

@@ -163,9 +163,9 @@ export async function selectFiles(
     throw new Error("No files found in the repository");
   }
 
-  console.log(`\n📁 Found ${allFiles.length} files in repository`);
-  console.log("💡 Type to search with fuzzy matching (e.g., 'rvcmd' matches 'src/cli/review-cmd.ts')");
-  console.log("💡 Use SPACE to toggle selection, ENTER to confirm all selected files\n");
+  // console.log(`\n📁 Found ${allFiles.length} files in repository`);
+  // console.log("💡 Type to search with fuzzy matching (e.g., 'rvcmd' matches 'src/cli/review-cmd.ts')");
+  // console.log("💡 Use SPACE to toggle selection, ENTER to confirm all selected files\n");
 
   // Use prompts autocompleteMultiselect for multi-select with fuzzy search
   const response = await prompts({

@@ -7,45 +7,7 @@ import {
 import { logger } from "../utils/logger.js";
 import chalk from "chalk";
 import { showConsoleBanner } from "../ui/components/console-banner.js";
-
-// Supported models (same as login-cmd.ts)
-const SUPPORTED_MODELS = {
-  // Anthropic models
-  "claude-3-5-sonnet-20241022": {
-    provider: "anthropic",
-    name: "Claude 3.5 Sonnet",
-    description: "Best balance of intelligence and speed",
-  },
-  "claude-3-5-haiku-20241022": {
-    provider: "anthropic",
-    name: "Claude 3.5 Haiku",
-    description: "Fast and cost-effective",
-  },
-  "claude-3-opus-20240229": {
-    provider: "anthropic",
-    name: "Claude 3 Opus",
-    description: "Most capable, highest cost",
-  },
-
-  // OpenAI models
-  "gpt-4-turbo": {
-    provider: "openai",
-    name: "GPT-4 Turbo",
-    description: "Latest GPT-4 with vision support",
-  },
-  "gpt-4": {
-    provider: "openai",
-    name: "GPT-4",
-    description: "Most capable GPT-4 model",
-  },
-  "gpt-3.5-turbo": {
-    provider: "openai",
-    name: "GPT-3.5 Turbo",
-    description: "Fast and affordable",
-  },
-};
-
-type ModelKey = keyof typeof SUPPORTED_MODELS;
+import { fetchSupportedModels } from "../utils/models.js";
 
 /**
  * List currently selected models
@@ -63,13 +25,17 @@ async function handleModelsList() {
       return;
     }
 
+    // Fetch models from backend
+    const models = await fetchSupportedModels();
+    const modelsMap = new Map(models.map((m) => [m.id, m]));
+
     const primary = status.tokens?.selectedModels?.primary;
     const fallback = status.tokens?.selectedModels?.fallback;
 
     console.log(chalk.cyan("\nCurrent Model Configuration\n"));
 
     if (primary) {
-      const primaryInfo = SUPPORTED_MODELS[primary as ModelKey];
+      const primaryInfo = modelsMap.get(primary);
       console.log(`Primary: ${chalk.bold(primaryInfo?.name || primary)}`);
       if (primaryInfo?.description) {
         console.log(chalk.gray(`  ${primaryInfo.description}`));
@@ -81,7 +47,7 @@ async function handleModelsList() {
     console.log();
 
     if (fallback) {
-      const fallbackInfo = SUPPORTED_MODELS[fallback as ModelKey];
+      const fallbackInfo = modelsMap.get(fallback);
       console.log(`Fallback: ${chalk.bold(fallbackInfo?.name || fallback)}`);
       if (fallbackInfo?.description) {
         console.log(chalk.gray(`  ${fallbackInfo.description}`));
@@ -117,12 +83,16 @@ async function handleModelsSelect() {
       return;
     }
 
+    // Fetch models from backend
+    const models = await fetchSupportedModels();
+    const modelsMap = new Map(models.map((m) => [m.id, m]));
+
     const currentPrimary = status.tokens?.selectedModels?.primary;
     const currentFallback = status.tokens?.selectedModels?.fallback;
 
-    const choices = Object.entries(SUPPORTED_MODELS).map(([id, info]) => ({
-      title: `${info.name} - ${info.description}`,
-      value: id,
+    const choices = models.map((model) => ({
+      title: `${model.name} - ${model.description}`,
+      value: model.id,
     }));
 
     console.log(chalk.cyan("\nUpdate Model Selection\n"));
@@ -177,7 +147,7 @@ async function handleModelsSelect() {
     // Save the selection
     await updateModelPreferences(primaryResponse.primary, fallback);
 
-    const primaryInfo = SUPPORTED_MODELS[primaryResponse.primary as ModelKey];
+    const primaryInfo = modelsMap.get(primaryResponse.primary);
 
     console.log(chalk.green("\n✅ Model preferences updated!\n"));
     console.log(
@@ -185,7 +155,7 @@ async function handleModelsSelect() {
     );
 
     if (fallback) {
-      const fallbackInfo = SUPPORTED_MODELS[fallback as ModelKey];
+      const fallbackInfo = modelsMap.get(fallback);
       console.log(`Fallback: ${chalk.bold(fallbackInfo?.name || fallback)}`);
     } else {
       console.log("Fallback: None");
@@ -204,34 +174,51 @@ async function handleModelsSelect() {
 async function handleModelsAvailable() {
   await showConsoleBanner();
 
-  console.log(chalk.cyan("\nAvailable Models\n"));
+  try {
+    const status = await getAuthStatus();
 
-  const anthropicModels = Object.entries(SUPPORTED_MODELS).filter(
-    ([_, info]) => info.provider === "anthropic"
-  );
-
-  const openaiModels = Object.entries(SUPPORTED_MODELS).filter(
-    ([_, info]) => info.provider === "openai"
-  );
-
-  if (anthropicModels.length > 0) {
-    console.log(chalk.bold("Anthropic Models:"));
-    for (const [id, info] of anthropicModels) {
-      console.log(`  ${chalk.green("•")} ${chalk.bold(info.name)}`);
-      console.log(`    ${chalk.gray(info.description)}`);
-      console.log(chalk.gray(`    ID: ${id}`));
-      console.log();
+    if (!status.authenticated) {
+      console.log(
+        chalk.yellow("\n⚠️  Not authenticated. Run 'driftal login' first.\n")
+      );
+      return;
     }
-  }
 
-  if (openaiModels.length > 0) {
-    console.log(chalk.bold("OpenAI Models:"));
-    for (const [id, info] of openaiModels) {
-      console.log(`  ${chalk.green("•")} ${chalk.bold(info.name)}`);
-      console.log(`    ${chalk.gray(info.description)}`);
-      console.log(chalk.gray(`    ID: ${id}`));
-      console.log();
+    // Fetch models from backend
+    const models = await fetchSupportedModels();
+
+    console.log(chalk.cyan("\nAvailable Models\n"));
+
+    const anthropicModels = models.filter(
+      (model) => model.provider === "anthropic"
+    );
+
+    const openaiModels = models.filter(
+      (model) => model.provider === "openai"
+    );
+
+    if (anthropicModels.length > 0) {
+      console.log(chalk.bold("Anthropic Models:"));
+      for (const model of anthropicModels) {
+        console.log(`  ${chalk.green("•")} ${chalk.bold(model.name)}`);
+        console.log(`    ${chalk.gray(model.description)}`);
+        console.log(chalk.gray(`    ID: ${model.id}`));
+        console.log();
+      }
     }
+
+    if (openaiModels.length > 0) {
+      console.log(chalk.bold("OpenAI Models:"));
+      for (const model of openaiModels) {
+        console.log(`  ${chalk.green("•")} ${chalk.bold(model.name)}`);
+        console.log(`    ${chalk.gray(model.description)}`);
+        console.log(chalk.gray(`    ID: ${model.id}`));
+        console.log();
+      }
+    }
+  } catch (error) {
+    logger.error("Error fetching available models:", error);
+    process.exit(1);
   }
 }
 

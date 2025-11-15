@@ -43,7 +43,7 @@ export const LLMProviderConfigSchema = z.object({
     .object({
       apiKey: z.string().optional(),
       apiKeyEnv: z.string().default("OPENAI_API_KEY"),
-      model: z.string().default("gpt-4-turbo"),
+      model: z.string().default("gpt-5-codex"),
       maxTokens: z.number().int().positive().default(4096),
     })
     .optional(),

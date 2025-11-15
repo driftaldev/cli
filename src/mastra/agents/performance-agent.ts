@@ -1,13 +1,13 @@
-import { Agent } from '@mastra/core';
-import type { AgentModelConfig } from '../types.js';
-import { codeAnalysisTools } from '../tools/code-analysis-tools.js';
-import { logger } from '../../utils/logger.js';
-import type { EnrichedContext } from '../../core/review/context-strategies.js';
-import { PerformanceContextStrategy } from '../../core/review/context-strategies.js';
-import type { Stack } from '@/core/indexer/stack-detector.js';
-import { getStackSpecificInstructions } from './stack-prompts.js';
-import { logLLMResponseToFile } from '../workflows/review-workflow.js';
-import { parseJSONFromResponse } from '../utils/json-extractor.js';
+import { Agent } from "@mastra/core";
+import type { AgentModelConfig } from "../types.js";
+import { codeAnalysisTools } from "../tools/code-analysis-tools.js";
+import { logger } from "../../utils/logger.js";
+import type { EnrichedContext } from "../../core/review/context-strategies.js";
+import { PerformanceContextStrategy } from "../../core/review/context-strategies.js";
+import type { Stack } from "@/core/indexer/stack-detector.js";
+import { getStackSpecificInstructions } from "./stack-prompts.js";
+import { logLLMResponseToFile } from "../workflows/review-workflow.js";
+import { parseJSONFromResponse } from "../utils/json-extractor.js";
 
 const PERFORMANCE_ANALYZER_INSTRUCTIONS = `You are a performance optimization expert with deep contextual understanding.
 
@@ -129,14 +129,14 @@ export function createPerformanceAgent(
   let instructions = PERFORMANCE_ANALYZER_INSTRUCTIONS;
 
   if (stacks && stacks.length > 0) {
-    const stackSpecific = getStackSpecificInstructions('performance', stacks);
+    const stackSpecific = getStackSpecificInstructions("performance", stacks);
     if (stackSpecific) {
       instructions = instructions + stackSpecific;
     }
   }
 
   return new Agent({
-    name: 'performance-analyzer',
+    name: "performance-analyzer",
     instructions,
     model: modelConfig,
     tools: {
@@ -151,10 +151,12 @@ export function createPerformanceAgent(
  */
 export async function runPerformanceAnalysisWithContext(
   agent: Agent,
-  context: EnrichedContext | { changedCode: string; fileName: string; language: string }
+  context:
+    | EnrichedContext
+    | { changedCode: string; fileName: string; language: string }
 ): Promise<any[]> {
   // Check if this is enriched context
-  const isEnriched = 'imports' in context || 'similarPatterns' in context;
+  const isEnriched = "imports" in context || "similarPatterns" in context;
 
   let prompt: string;
 
@@ -162,7 +164,9 @@ export async function runPerformanceAnalysisWithContext(
     // Use the performance strategy to format the enriched context
     const strategy = new PerformanceContextStrategy();
     prompt = strategy.formatPrompt(context as EnrichedContext);
-    logger.debug(`[Performance Agent] Using ENRICHED context for ${context.fileName}`);
+    logger.debug(
+      `[Performance Agent] Using ENRICHED context for ${context.fileName}`
+    );
   } else {
     // Fallback to basic prompt
     prompt = `Analyze the following code for performance issues:
@@ -204,20 +208,24 @@ Use the analyzeComplexity and estimatePerformance tools to assess the code, then
 
 Focus on real performance bottlenecks that would impact production systems.
 Return ONLY valid JSON with your findings.`;
-    logger.debug(`[Performance Agent] Using BASIC context for ${context.fileName}`);
+    logger.debug(
+      `[Performance Agent] Using BASIC context for ${context.fileName}`
+    );
   }
 
   // Log the full prompt being sent to LLM
   logger.debug(`[Performance Agent] ========== FULL PROMPT TO LLM ==========`);
   logger.debug(prompt);
-  logger.debug(`[Performance Agent] ========== END PROMPT (${prompt.length} chars) ==========`);
+  logger.debug(
+    `[Performance Agent] ========== END PROMPT (${prompt.length} chars) ==========`
+  );
 
   try {
     const result = await agent.generate(prompt, {
-      maxSteps: 3 // Allow tool use
+      maxSteps: 3, // Allow tool use
     });
 
-    logger.debug('[Performance Agent] Raw LLM response:', result.text);
+    logger.debug("[Performance Agent] Raw LLM response:", result.text);
 
     // Log LLM response to file
     await logLLMResponseToFile(context.fileName, "Performance", result.text);
@@ -225,27 +233,27 @@ Return ONLY valid JSON with your findings.`;
     // Parse the JSON response using robust extraction
     const parsed = parseJSONFromResponse(result.text);
     if (parsed) {
-      logger.debug('[Performance Agent] Parsed JSON:', parsed);
+      logger.debug("[Performance Agent] Parsed JSON:", parsed);
       const issues = parsed.issues || [];
 
       // Ensure all issues have required fields with defaults
       const normalizedIssues = issues.map((issue: any) => ({
         ...issue,
         confidence: issue.confidence ?? 0.8, // Default confidence if not provided
-        type: issue.type || 'performance',
-        severity: issue.severity || 'medium',
-        tags: issue.tags || []
+        type: issue.type || "performance",
+        severity: issue.severity || "medium",
+        tags: issue.tags || [],
       }));
 
-      logger.debug('[Performance Agent] Parsed issues:', normalizedIssues);
+      logger.debug("[Performance Agent] Parsed issues:", normalizedIssues);
       return normalizedIssues;
     }
 
-    logger.debug('[Performance Agent] No valid JSON found in response');
+    logger.debug("[Performance Agent] No valid JSON found in response");
     return [];
   } catch (error) {
-    logger.error('Performance analysis failed:', error);
-    logger.debug('[Performance Agent] Error details:', error);
+    logger.error("Performance analysis failed:", error);
+    logger.debug("[Performance Agent] Error details:", error);
     return [];
   }
 }

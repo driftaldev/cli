@@ -81,11 +81,37 @@ export class MastraReviewOrchestrator {
 
     switch (primary) {
       case "cloud-proxy": {
-        const tokens = await loadAuthTokens();
+        let tokens = await loadAuthTokens();
         if (!tokens?.accessToken) {
           throw new Error(
             "Not authenticated with cloud proxy. Please run 'driftal login'."
           );
+        }
+
+        // Check if token is expired and refresh if needed
+        const { isTokenExpired } = await import("../utils/token-manager.js");
+        const { refreshAccessToken } = await import("../utils/auth.js");
+        const { logger } = await import("../utils/logger.js");
+
+        if (isTokenExpired(tokens)) {
+          if (tokens.refreshToken) {
+            logger.debug(
+              "Token expired, refreshing before Mastra model config..."
+            );
+            const refreshResult = await refreshAccessToken(tokens.refreshToken);
+            if (refreshResult.success && refreshResult.tokens) {
+              tokens = refreshResult.tokens;
+              logger.debug("Token refreshed successfully");
+            } else {
+              throw new Error(
+                "Token expired and refresh failed. Please run 'driftal login' to re-authenticate."
+              );
+            }
+          } else {
+            throw new Error(
+              "Token expired and no refresh token available. Please run 'driftal login' to re-authenticate."
+            );
+          }
         }
 
         const proxyUrl =

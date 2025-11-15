@@ -48,10 +48,9 @@ export class CloudProxyProvider extends LLMProvider {
    * Automatically refreshes tokens if they're expired or about to expire
    */
   private async ensureAuthenticated(): Promise<string> {
-    // Load tokens if not cached
-    if (!this.tokens) {
-      this.tokens = await loadAuthTokens();
-    }
+    // Always reload tokens from disk to get the latest state
+    // This handles cases where another process may have refreshed the tokens
+    this.tokens = await loadAuthTokens();
 
     if (!this.tokens) {
       throw new Error(
@@ -138,6 +137,11 @@ export class CloudProxyProvider extends LLMProvider {
 
       // Handle 401 - try to refresh token and retry once
       if (response.status === 401) {
+        logger.debug("Received 401 Unauthorized from backend");
+
+        // Reload tokens from disk first (another process may have refreshed)
+        this.tokens = await loadAuthTokens();
+
         // Try to refresh the token if we have a refresh token
         if (this.tokens?.refreshToken) {
           logger.debug(
@@ -187,8 +191,10 @@ export class CloudProxyProvider extends LLMProvider {
 
               return retryResponse;
             } else {
+              const errorMsg = refreshResult.error || "Unknown error";
+              logger.error("Token refresh failed:", errorMsg);
               throw new Error(
-                "Failed to refresh token. Please run 'driftal login' to re-authenticate."
+                `Failed to refresh token: ${errorMsg}. Please run 'driftal login' to re-authenticate.`
               );
             }
           } catch (error) {
@@ -201,8 +207,9 @@ export class CloudProxyProvider extends LLMProvider {
             );
           }
         } else {
+          logger.warn("No refresh token available, cannot refresh");
           throw new Error(
-            "Authentication failed. Please run 'driftal login' to re-authenticate."
+            "Authentication failed and no refresh token available. Please run 'driftal login' to re-authenticate."
           );
         }
       }

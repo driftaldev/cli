@@ -170,8 +170,10 @@ async function startCallbackServer(state: string): Promise<{
         const tokens: AuthTokens = {
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
-          // No expiration - tokens persist until manual logout
-          expiresAt: undefined,
+          // Respect backend expiration if provided, otherwise tokens persist indefinitely
+          expiresAt: tokenData.expires_in
+            ? Date.now() + tokenData.expires_in * 1000
+            : undefined,
           userEmail: tokenData.user_email,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -180,6 +182,13 @@ async function startCallbackServer(state: string): Promise<{
             fallback: "gpt-4",
           },
         };
+
+        // Log token details for debugging
+        logger.debug("Tokens received:", {
+          hasRefreshToken: !!tokenData.refresh_token,
+          expiresIn: tokenData.expires_in,
+          expiresAt: tokens.expiresAt,
+        });
 
         // Success response
         res.writeHead(200, { "Content-Type": "text/html" });
@@ -317,6 +326,8 @@ export async function refreshAccessToken(
     // Load existing tokens to preserve model preferences and user email
     const existingTokens = await loadAuthTokens();
 
+    logger.debug("Attempting to refresh access token...");
+
     const response = await fetch(buildAuthApiUrl("/auth/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -324,7 +335,18 @@ export async function refreshAccessToken(
     });
 
     if (!response.ok) {
-      throw new Error(`Token refresh failed: ${response.statusText}`);
+      const errorText = await response.text();
+      let errorMessage = `Token refresh failed: ${response.statusText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error) {
+          errorMessage = `Token refresh failed: ${errorJson.error}`;
+        }
+      } catch {
+        // Use default error message
+      }
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
     }
 
     const data = (await response.json()) as {
@@ -336,13 +358,22 @@ export async function refreshAccessToken(
     const tokens: AuthTokens = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token || refreshToken,
-      // No expiration - tokens persist until manual logout
-      expiresAt: undefined,
+      // Respect backend expiration if provided, otherwise tokens persist indefinitely
+      expiresAt: data.expires_in
+        ? Date.now() + data.expires_in * 1000
+        : undefined,
       selectedModels: existingTokens?.selectedModels,
       userEmail: existingTokens?.userEmail,
       createdAt: existingTokens?.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
+
+    // Log refresh details for debugging
+    logger.debug("Token refreshed:", {
+      hasRefreshToken: !!data.refresh_token,
+      expiresIn: data.expires_in,
+      expiresAt: tokens.expiresAt,
+    });
 
     await saveAuthTokens(tokens);
 

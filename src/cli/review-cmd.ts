@@ -54,10 +54,33 @@ async function logReviewToBackend(
   userEmail: string
 ): Promise<void> {
   try {
-    const tokens = await loadAuthTokens();
+    let tokens = await loadAuthTokens();
     if (!tokens) {
       logger.debug("Not authenticated, skipping review logging");
       return;
+    }
+
+    // Check if token is expired and refresh if needed
+    const { isTokenExpired } = await import("../utils/token-manager.js");
+    const { refreshAccessToken } = await import("../utils/auth.js");
+
+    if (isTokenExpired(tokens)) {
+      if (tokens.refreshToken) {
+        logger.debug("Token expired, refreshing before logging review...");
+        const refreshResult = await refreshAccessToken(tokens.refreshToken);
+        if (refreshResult.success && refreshResult.tokens) {
+          tokens = refreshResult.tokens;
+          logger.debug("Token refreshed successfully");
+        } else {
+          logger.debug("Token refresh failed, skipping review logging");
+          return;
+        }
+      } else {
+        logger.debug(
+          "Token expired and no refresh token, skipping review logging"
+        );
+        return;
+      }
     }
 
     const CLOUD_PROXY_URL =

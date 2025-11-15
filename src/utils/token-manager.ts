@@ -66,7 +66,7 @@ export async function saveAuthTokens(tokens: AuthTokens): Promise<void> {
   const authPath = getAuthFilePath();
   const data = {
     ...tokens,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
   };
 
   await fs.writeFile(authPath, JSON.stringify(data, null, 2), "utf-8");
@@ -75,7 +75,10 @@ export async function saveAuthTokens(tokens: AuthTokens): Promise<void> {
 /**
  * Update model preferences without changing tokens
  */
-export async function updateModelPreferences(primary: string, fallback?: string): Promise<void> {
+export async function updateModelPreferences(
+  primary: string,
+  fallback?: string
+): Promise<void> {
   const tokens = await loadAuthTokens();
   if (!tokens) {
     throw new Error("No authentication found. Run 'driftal login' first.");
@@ -89,15 +92,25 @@ export async function updateModelPreferences(primary: string, fallback?: string)
 
 /**
  * Check if the access token is expired
+ * Tokens are considered expired if they're within 5 minutes of expiration
  */
 export function isTokenExpired(tokens: AuthTokens): boolean {
   if (!tokens.expiresAt) {
-    return false; // No expiration set
+    return false; // No expiration set - token persists until manual logout
   }
 
   // Consider expired if within 5 minutes of expiration
   const bufferMs = 5 * 60 * 1000;
-  return Date.now() >= (tokens.expiresAt - bufferMs);
+  const isExpired = Date.now() >= tokens.expiresAt - bufferMs;
+
+  if (isExpired) {
+    const expiresAtDate = new Date(tokens.expiresAt);
+    console.log(
+      `Token expired or expiring soon. Expires at: ${expiresAtDate.toISOString()}`
+    );
+  }
+
+  return isExpired;
 }
 
 /**
@@ -131,6 +144,6 @@ export async function getAuthStatus(): Promise<{
   return {
     authenticated: true,
     expired,
-    tokens
+    tokens,
   };
 }

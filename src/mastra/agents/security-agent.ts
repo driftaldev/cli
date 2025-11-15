@@ -1,13 +1,13 @@
-import { Agent } from '@mastra/core';
-import type { AgentModelConfig } from '../types.js';
-import { codeAnalysisTools } from '../tools/code-analysis-tools.js';
-import { logger } from '../../utils/logger.js';
-import type { EnrichedContext } from '../../core/review/context-strategies.js';
-import { SecurityContextStrategy } from '../../core/review/context-strategies.js';
-import type { Stack } from '@/core/indexer/stack-detector.js';
-import { getStackSpecificInstructions } from './stack-prompts.js';
-import { logLLMResponseToFile } from '../workflows/review-workflow.js';
-import { parseJSONFromResponse } from '../utils/json-extractor.js';
+import { Agent } from "@mastra/core";
+import type { AgentModelConfig } from "../types.js";
+import { codeAnalysisTools } from "../tools/code-analysis-tools.js";
+import { logger } from "../../utils/logger.js";
+import type { EnrichedContext } from "../../core/review/context-strategies.js";
+import { SecurityContextStrategy } from "../../core/review/context-strategies.js";
+import type { Stack } from "@/core/indexer/stack-detector.js";
+import { getStackSpecificInstructions } from "./stack-prompts.js";
+import { logLLMResponseToFile } from "../workflows/review-workflow.js";
+import { parseJSONFromResponse } from "../utils/json-extractor.js";
 
 const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
@@ -140,14 +140,14 @@ export function createSecurityAgent(
   let instructions = SECURITY_ANALYZER_INSTRUCTIONS;
 
   if (stacks && stacks.length > 0) {
-    const stackSpecific = getStackSpecificInstructions('security', stacks);
+    const stackSpecific = getStackSpecificInstructions("security", stacks);
     if (stackSpecific) {
       instructions = instructions + stackSpecific;
     }
   }
 
   return new Agent({
-    name: 'security-analyzer',
+    name: "security-analyzer",
     instructions,
     model: modelConfig,
     tools: {
@@ -161,10 +161,12 @@ export function createSecurityAgent(
  */
 export async function runSecurityAnalysisWithContext(
   agent: Agent,
-  context: EnrichedContext | { changedCode: string; fileName: string; language: string }
+  context:
+    | EnrichedContext
+    | { changedCode: string; fileName: string; language: string }
 ): Promise<any[]> {
   // Check if this is enriched context
-  const isEnriched = 'imports' in context || 'typeDefinitions' in context;
+  const isEnriched = "imports" in context || "typeDefinitions" in context;
 
   let prompt: string;
 
@@ -172,7 +174,9 @@ export async function runSecurityAnalysisWithContext(
     // Use the security strategy to format the enriched context
     const strategy = new SecurityContextStrategy();
     prompt = strategy.formatPrompt(context as EnrichedContext);
-    logger.debug(`[Security Agent] Using ENRICHED context for ${context.fileName}`);
+    logger.debug(
+      `[Security Agent] Using ENRICHED context for ${context.fileName}`
+    );
   } else {
     // Fallback to basic prompt
     prompt = `Analyze the following code for security vulnerabilities:
@@ -219,20 +223,24 @@ Use the detectVulnerabilities tool to scan for common security issues, then syst
 
 Focus on real, exploitable vulnerabilities. Avoid false positives.
 Return ONLY valid JSON with your findings.`;
-    logger.debug(`[Security Agent] Using BASIC context for ${context.fileName}`);
+    logger.debug(
+      `[Security Agent] Using BASIC context for ${context.fileName}`
+    );
   }
 
   // Log the full prompt being sent to LLM
   logger.debug(`[Security Agent] ========== FULL PROMPT TO LLM ==========`);
   logger.debug(prompt);
-  logger.debug(`[Security Agent] ========== END PROMPT (${prompt.length} chars) ==========`);
+  logger.debug(
+    `[Security Agent] ========== END PROMPT (${prompt.length} chars) ==========`
+  );
 
   try {
     const result = await agent.generate(prompt, {
-      maxSteps: 3 // Allow tool use
+      maxSteps: 3, // Allow tool use
     });
 
-    logger.debug('[Security Agent] Raw LLM response:', result.text);
+    logger.debug("[Security Agent] Raw LLM response:", result.text);
 
     // Log LLM response to file
     await logLLMResponseToFile(context.fileName, "Security", result.text);
@@ -240,27 +248,27 @@ Return ONLY valid JSON with your findings.`;
     // Parse the JSON response using robust extraction
     const parsed = parseJSONFromResponse(result.text);
     if (parsed) {
-      logger.debug('[Security Agent] Parsed JSON:', parsed);
+      logger.debug("[Security Agent] Parsed JSON:", parsed);
       const issues = parsed.issues || [];
 
       // Ensure all issues have required fields with defaults
       const normalizedIssues = issues.map((issue: any) => ({
         ...issue,
         confidence: issue.confidence ?? 0.8, // Default confidence if not provided
-        type: issue.type || 'security',
-        severity: issue.severity || 'medium',
-        tags: issue.tags || []
+        type: issue.type || "security",
+        severity: issue.severity || "medium",
+        tags: issue.tags || [],
       }));
 
-      logger.debug('[Security Agent] Parsed issues:', normalizedIssues);
+      logger.debug("[Security Agent] Parsed issues:", normalizedIssues);
       return normalizedIssues;
     }
 
-    logger.debug('[Security Agent] No valid JSON found in response');
+    logger.debug("[Security Agent] No valid JSON found in response");
     return [];
   } catch (error) {
-    logger.error('Security analysis failed:', error);
-    logger.debug('[Security Agent] Error details:', error);
+    logger.error("Security analysis failed:", error);
+    logger.debug("[Security Agent] Error details:", error);
     return [];
   }
 }

@@ -24,6 +24,7 @@ import { createMemoryCommand } from "./memory-cmd.js";
 import { registerLoginCommand } from "./login-cmd.js";
 import { registerLogoutCommand } from "./logout-cmd.js";
 import { registerModelsCommand } from "./models-cmd.js";
+import { registerWhoamiCommand } from "./whoami-cmd.js";
 import { CacheMetrics } from "../core/cache/metrics.js";
 import { registerTestInkCommand } from "./testink-cmd.js";
 
@@ -36,6 +37,7 @@ program.name("scout-code").description("Scout Code CLI and MCP server");
 registerLoginCommand(program);
 registerLogoutCommand(program);
 registerModelsCommand(program);
+registerWhoamiCommand(program);
 
 // Other commands
 registerIndexCommand(program);

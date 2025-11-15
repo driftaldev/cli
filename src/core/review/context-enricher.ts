@@ -10,6 +10,7 @@ import { EnrichedContext } from './context-strategies.js';
 import { logger } from '../../utils/logger.js';
 import { MossClient } from '../indexer/moss-client.js';
 import { execSync } from 'child_process';
+import { getLanguageParser, Import as ParserImport, TypeDefinition as ParserType } from '../parsers/language-parser.js';
 
 export interface ContextEnricherOptions {
   repoPath: string;
@@ -233,123 +234,272 @@ export class ContextEnricher {
   }
 
   /**
-   * Parse import statements from code
+   * Parse import statements from code using language-specific parsers
    */
   private parseImportStatements(
     content: string,
     language: string
   ): Array<{ path: string; names: string[] }> {
-    const statements: Array<{ path: string; names: string[] }> = [];
+    logger.debug(`[ContextEnricher] Parsing imports using language parser for ${language}`);
 
-    // ES6 named imports: import { foo, bar } from 'path'
-    const namedImportPattern = /import\s+{([^}]+)}\s+from\s+['"]([^'"]+)['"]/g;
-    let match;
-    while ((match = namedImportPattern.exec(content)) !== null) {
-      const names = match[1]
-        .split(',')
-        .map((n) => n.trim().split(/\s+as\s+/)[0].trim())
-        .filter((n) => n.length > 0);
-      statements.push({ path: match[2], names });
+    try {
+      // Use language-specific parser
+      const parser = getLanguageParser(content, language);
+      const imports = parser.parseImports();
+
+      logger.debug(`[ContextEnricher] Language parser extracted ${imports.length} imports`);
+
+      // Convert to expected format
+      const statements = imports.map(imp => {
+        // Get imported names from items, or use alias for namespace imports
+        let names: string[] = [];
+
+        if (imp.items.length > 0) {
+          // Named imports
+          names = imp.items.map(item => item.alias || item.name);
+        } else if (imp.alias && imp.alias !== '*') {
+          // Namespace import (import * as foo)
+          names = [imp.alias];
+        } else if (imp.alias === '*') {
+          // Glob import
+          names = ['*'];
+        }
+
+        return {
+          path: imp.source,
+          names,
+        };
+      });
+
+      logger.debug(`[ContextEnricher] Converted to ${statements.length} import statements`);
+      return statements;
+    } catch (error) {
+      logger.warn(`[ContextEnricher] Error parsing imports with language parser:`, error);
+      // Fallback to empty array instead of crashing
+      return [];
     }
-
-    // ES6 default imports: import foo from 'path'
-    const defaultImportPattern = /import\s+(\w+)\s+from\s+['"]([^'"]+)['"]/g;
-    while ((match = defaultImportPattern.exec(content)) !== null) {
-      statements.push({ path: match[2], names: [match[1]] });
-    }
-
-    // ES6 namespace imports: import * as foo from 'path'
-    const namespacePattern = /import\s+\*\s+as\s+(\w+)\s+from\s+['"]([^'"]+)['"]/g;
-    while ((match = namespacePattern.exec(content)) !== null) {
-      statements.push({ path: match[2], names: [match[1]] });
-    }
-
-    // Require statements: const foo = require('path')
-    const requirePattern = /(?:const|let|var)\s+(?:{([^}]+)}|(\w+))\s*=\s*require\s*\(['"]([^'"]+)['"]\)/g;
-    while ((match = requirePattern.exec(content)) !== null) {
-      const names = match[1]
-        ? match[1].split(',').map((n) => n.trim())
-        : [match[2]];
-      statements.push({ path: match[3], names });
-    }
-
-    return statements;
   }
 
   /**
-   * Resolve import path using right-to-left grep approach
+   * Resolve import path using language-aware resolution
    */
   private async resolveImportPath(importPath: string, fromFile: string): Promise<string | null> {
-    logger.debug(`[ContextEnricher] resolveImportPath called for: "${importPath}"`);
+    logger.debug(`[ContextEnricher] resolveImportPath called for: "${importPath}" from ${fromFile}`);
 
+    // Detect language from file extension
+    const fileExt = path.extname(fromFile);
+    let language = 'unknown';
+    if (['.ts', '.tsx', '.js', '.jsx'].includes(fileExt)) {
+      language = 'typescript';
+    } else if (fileExt === '.py') {
+      language = 'python';
+    } else if (fileExt === '.go') {
+      language = 'go';
+    } else if (fileExt === '.rs') {
+      language = 'rust';
+    }
+
+    logger.debug(`[ContextEnricher] Detected language: ${language}`);
+
+    // Language-specific resolution
+    switch (language) {
+      case 'typescript':
+        return this.resolveTypescriptImport(importPath, fromFile);
+      case 'python':
+        return this.resolvePythonImport(importPath, fromFile);
+      case 'go':
+        return this.resolveGoImport(importPath, fromFile);
+      case 'rust':
+        return this.resolveRustImport(importPath, fromFile);
+      default:
+        logger.debug(`[ContextEnricher] Unknown language, skipping resolution`);
+        return null;
+    }
+  }
+
+  /**
+   * Resolve TypeScript/JavaScript imports
+   */
+  private async resolveTypescriptImport(importPath: string, fromFile: string): Promise<string | null> {
     // Skip obvious external packages (no @ or . prefix)
     if (!importPath.startsWith('@') && !importPath.startsWith('.') && !importPath.startsWith('/')) {
-      logger.debug(`[ContextEnricher] "${importPath}" is external package (no @/./ prefix)`);
+      logger.debug(`[ContextEnricher] "${importPath}" is external package`);
       return null;
     }
 
-    // Extract base filename from import path
-    // e.g., "@/services/wallet.service" → "wallet.service"
-    // e.g., "./utils/helper" → "helper"
+    // Extract base filename
     const parts = importPath.split('/');
     const baseFileName = parts[parts.length - 1];
 
-    logger.debug(`[ContextEnricher] Extracted base filename: "${baseFileName}"`);
-
-    // File extensions to try (TypeScript/JavaScript)
+    // File extensions to try
     const extensions = ['.ts', '.tsx', '.js', '.jsx'];
 
-    // Try to find file using grep (right-to-left approach)
+    // Try direct file match
     for (const ext of extensions) {
       const searchPattern = `${baseFileName}${ext}`;
-      logger.debug(`[ContextEnricher] Trying extension: ${ext}`);
-      logger.debug(`[ContextEnricher] Searching for: "${searchPattern}"`);
-
       try {
-        // Use find command to locate file in repo
         const cmd = `find "${this.options.repoPath}" -name "${searchPattern}" -type f 2>/dev/null | head -1`;
-        logger.debug(`[ContextEnricher] Executing command: ${cmd}`);
-
         const result = execSync(cmd, { encoding: 'utf-8' }).trim();
-        logger.debug(`[ContextEnricher] Command result: ${result ? `"${result}"` : '(empty)'}`);
 
         if (result) {
           logger.debug(`[ContextEnricher] ✓ Found "${importPath}" → "${result}"`);
           return result;
-        } else {
-          logger.debug(`[ContextEnricher] No match for ${ext}, continuing to next extension`);
         }
       } catch (error) {
-        logger.debug(`[ContextEnricher] Error during find with ${ext}: ${error}`);
+        // Continue to next extension
       }
     }
 
-    // Also try index files (e.g., @/components/Button → components/Button/index.tsx)
-    logger.debug(`[ContextEnricher] Trying index files for "${baseFileName}"`);
+    // Try index files
     for (const ext of extensions) {
-      const searchPattern = `index${ext}`;
-      logger.debug(`[ContextEnricher] Trying index with extension: ${ext}`);
-
       try {
-        // Search for index files in a directory matching the last part of the import
         const cmd = `find "${this.options.repoPath}" -path "*/${baseFileName}/index${ext}" -type f 2>/dev/null | head -1`;
-        logger.debug(`[ContextEnricher] Executing index command: ${cmd}`);
-
         const result = execSync(cmd, { encoding: 'utf-8' }).trim();
-        logger.debug(`[ContextEnricher] Index command result: ${result ? `"${result}"` : '(empty)'}`);
 
         if (result) {
           logger.debug(`[ContextEnricher] ✓ Found index file for "${importPath}" → "${result}"`);
           return result;
-        } else {
-          logger.debug(`[ContextEnricher] No index match for ${ext}, continuing`);
         }
       } catch (error) {
-        logger.debug(`[ContextEnricher] Error during index find with ${ext}: ${error}`);
+        // Continue
       }
     }
 
-    logger.debug(`[ContextEnricher] ✗ Could not resolve "${importPath}" - likely external package`);
+    logger.debug(`[ContextEnricher] ✗ Could not resolve "${importPath}"`);
+    return null;
+  }
+
+  /**
+   * Resolve Python imports
+   */
+  private async resolvePythonImport(importPath: string, fromFile: string): Promise<string | null> {
+    // Convert module path to file path
+    // e.g., "foo.bar.baz" → "foo/bar/baz.py" or "foo/bar/baz/__init__.py"
+    const modulePath = importPath.replace(/\./g, '/');
+
+    // Try direct .py file
+    try {
+      const cmd = `find "${this.options.repoPath}" -path "*/${modulePath}.py" -type f 2>/dev/null | head -1`;
+      const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+
+      if (result) {
+        logger.debug(`[ContextEnricher] ✓ Found Python module "${importPath}" → "${result}"`);
+        return result;
+      }
+    } catch (error) {
+      // Continue
+    }
+
+    // Try __init__.py in directory
+    try {
+      const cmd = `find "${this.options.repoPath}" -path "*/${modulePath}/__init__.py" -type f 2>/dev/null | head -1`;
+      const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+
+      if (result) {
+        logger.debug(`[ContextEnricher] ✓ Found Python package "${importPath}" → "${result}"`);
+        return result;
+      }
+    } catch (error) {
+      // Continue
+    }
+
+    // Try relative imports (same directory)
+    if (importPath.startsWith('.')) {
+      const fromDir = path.dirname(fromFile);
+      const relativePath = path.join(fromDir, modulePath + '.py');
+
+      if (await this.fileExists(relativePath)) {
+        logger.debug(`[ContextEnricher] ✓ Found relative Python import "${importPath}" → "${relativePath}"`);
+        return relativePath;
+      }
+    }
+
+    logger.debug(`[ContextEnricher] ✗ Could not resolve Python import "${importPath}"`);
+    return null;
+  }
+
+  /**
+   * Resolve Go imports
+   */
+  private async resolveGoImport(importPath: string, fromFile: string): Promise<string | null> {
+    // For relative imports (./foo or ../foo), resolve directly
+    if (importPath.startsWith('.')) {
+      const fromDir = path.dirname(fromFile);
+      const resolvedDir = path.resolve(fromDir, importPath);
+
+      // Check for .go files in that directory
+      try {
+        const cmd = `find "${resolvedDir}" -maxdepth 1 -name "*.go" -type f 2>/dev/null | head -1`;
+        const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+
+        if (result) {
+          logger.debug(`[ContextEnricher] ✓ Found Go package "${importPath}" → "${result}"`);
+          return result;
+        }
+      } catch (error) {
+        // Continue
+      }
+    }
+
+    // For absolute imports, extract the last part of the path
+    // e.g., "github.com/user/repo/pkg/utils" → search for "utils" directory with .go files
+    const parts = importPath.split('/');
+    const packageName = parts[parts.length - 1];
+
+    try {
+      const cmd = `find "${this.options.repoPath}" -type d -name "${packageName}" 2>/dev/null | while read dir; do find "$dir" -maxdepth 1 -name "*.go" -type f 2>/dev/null | head -1; done | head -1`;
+      const result = execSync(cmd, { encoding: 'utf-8' }).trim();
+
+      if (result) {
+        logger.debug(`[ContextEnricher] ✓ Found Go package "${importPath}" → "${result}"`);
+        return result;
+      }
+    } catch (error) {
+      // Continue
+    }
+
+    logger.debug(`[ContextEnricher] ✗ Could not resolve Go import "${importPath}"`);
+    return null;
+  }
+
+  /**
+   * Resolve Rust imports
+   */
+  private async resolveRustImport(importPath: string, fromFile: string): Promise<string | null> {
+    // Handle crate imports
+    if (importPath.startsWith('crate::')) {
+      // Find src/lib.rs or src/main.rs as starting point
+      const srcPath = path.join(this.options.repoPath, 'src');
+      const modulePath = importPath.replace('crate::', '').replace(/::/g, '/');
+
+      // Try module file
+      const moduleFile = path.join(srcPath, modulePath + '.rs');
+      if (await this.fileExists(moduleFile)) {
+        logger.debug(`[ContextEnricher] ✓ Found Rust module "${importPath}" → "${moduleFile}"`);
+        return moduleFile;
+      }
+
+      // Try mod.rs in directory
+      const modFile = path.join(srcPath, modulePath, 'mod.rs');
+      if (await this.fileExists(modFile)) {
+        logger.debug(`[ContextEnricher] ✓ Found Rust module "${importPath}" → "${modFile}"`);
+        return modFile;
+      }
+    }
+
+    // Handle super/self imports
+    if (importPath.startsWith('super::') || importPath.startsWith('self::')) {
+      const fromDir = path.dirname(fromFile);
+      const relativePath = importPath.replace('super::', '../').replace('self::', './').replace(/::/g, '/');
+      const resolvedPath = path.resolve(fromDir, relativePath + '.rs');
+
+      if (await this.fileExists(resolvedPath)) {
+        logger.debug(`[ContextEnricher] ✓ Found Rust module "${importPath}" → "${resolvedPath}"`);
+        return resolvedPath;
+      }
+    }
+
+    logger.debug(`[ContextEnricher] ✗ Could not resolve Rust import "${importPath}"`);
     return null;
   }
 
@@ -395,65 +545,122 @@ export class ContextEnricher {
   }
 
   /**
-   * Extract type definitions from file
+   * Extract type definitions from file using language-specific parsers
    */
   private async extractTypes(
     content: string,
     filePath: string,
     language: string
   ): Promise<TypeInfo[]> {
-    logger.debug(`[ContextEnricher] Extracting types from ${filePath}`);
+    logger.debug(`[ContextEnricher] Extracting types from ${filePath} (${language})`);
 
-    if (!['typescript', 'tsx', 'ts'].includes(language.toLowerCase())) {
-      logger.debug(`[ContextEnricher] Skipping type extraction (not TypeScript)`);
+    try {
+      // Use language-specific parser
+      const parser = getLanguageParser(content, language);
+      const parsedTypes = parser.parseTypes();
+
+      logger.debug(`[ContextEnricher] Language parser extracted ${parsedTypes.length} types`);
+
+      // Convert to expected format
+      const types: TypeInfo[] = parsedTypes.map(type => {
+        // Reconstruct a definition string (for display purposes)
+        let definition = this.formatTypeDefinition(type);
+
+        return {
+          name: type.name,
+          definition,
+          source: filePath,
+        };
+      });
+
+      // Count by type for logging
+      const counts = parsedTypes.reduce((acc, type) => {
+        acc[type.type] = (acc[type.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      logger.debug(
+        `[ContextEnricher] Extracted ${types.length} types: ` +
+        Object.entries(counts).map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`).join(', ')
+      );
+
+      return types;
+    } catch (error) {
+      logger.warn(`[ContextEnricher] Error extracting types with language parser:`, error);
       return [];
     }
+  }
 
-    const types: TypeInfo[] = [];
+  /**
+   * Format a type definition for display
+   */
+  private formatTypeDefinition(type: ParserType): string {
+    const parts: string[] = [];
 
-    // Extract interfaces
-    const interfacePattern = /(?:export\s+)?interface\s+(\w+)\s*(?:extends\s+[\w,\s]+)?{[\s\S]{0,500}?}/gm;
-    let match;
-    let interfaceCount = 0;
-    while ((match = interfacePattern.exec(content)) !== null) {
-      types.push({
-        name: match[1],
-        definition: match[0],
-        source: filePath,
-      });
-      interfaceCount++;
+    // Type declaration
+    if (type.type === 'interface') {
+      parts.push(`interface ${type.name}`);
+      if (type.generics) {
+        parts.push(`<${type.generics.join(', ')}>`);
+      }
+      if (type.extends && type.extends.length > 0) {
+        parts.push(` extends ${type.extends.join(', ')}`);
+      }
+    } else if (type.type === 'class') {
+      parts.push(`class ${type.name}`);
+      if (type.generics) {
+        parts.push(`<${type.generics.join(', ')}>`);
+      }
+      if (type.extends && type.extends.length > 0) {
+        parts.push(` extends ${type.extends.join(', ')}`);
+      }
+      if (type.implements && type.implements.length > 0) {
+        parts.push(` implements ${type.implements.join(', ')}`);
+      }
+    } else if (type.type === 'struct') {
+      parts.push(`struct ${type.name}`);
+      if (type.generics) {
+        parts.push(`<${type.generics.join(', ')}>`);
+      }
+    } else if (type.type === 'trait') {
+      parts.push(`trait ${type.name}`);
+      if (type.generics) {
+        parts.push(`<${type.generics.join(', ')}>`);
+      }
+    } else if (type.type === 'enum') {
+      parts.push(`enum ${type.name}`);
+    } else {
+      parts.push(`type ${type.name}`);
     }
 
-    // Extract type aliases
-    const typePattern = /(?:export\s+)?type\s+(\w+)\s*=[\s\S]{0,300}?(?:;|\n)/gm;
-    let typeCount = 0;
-    while ((match = typePattern.exec(content)) !== null) {
-      types.push({
-        name: match[1],
-        definition: match[0],
-        source: filePath,
+    // Add properties if available
+    if (type.properties && type.properties.length > 0) {
+      parts.push(' { ');
+      const propLines = type.properties.slice(0, 10).map(prop => {
+        return `${prop.name}${prop.optional ? '?' : ''}: ${prop.type || 'any'}`;
       });
-      typeCount++;
+      parts.push(propLines.join(', '));
+      if (type.properties.length > 10) {
+        parts.push(`, ... (${type.properties.length - 10} more)`);
+      }
+      parts.push(' }');
     }
 
-    // Extract enums
-    const enumPattern = /(?:export\s+)?enum\s+(\w+)\s*{[\s\S]{0,300}?}/gm;
-    let enumCount = 0;
-    while ((match = enumPattern.exec(content)) !== null) {
-      types.push({
-        name: match[1],
-        definition: match[0],
-        source: filePath,
+    // Add methods if available (for interfaces/traits)
+    if (type.methods && type.methods.length > 0 && !type.properties) {
+      parts.push(' { ');
+      const methodLines = type.methods.slice(0, 5).map(method => {
+        const params = method.parameters.map(p => `${p.name}: ${p.type || 'any'}`).join(', ');
+        return `${method.name}(${params})${method.returnType ? `: ${method.returnType}` : ''}`;
       });
-      enumCount++;
+      parts.push(methodLines.join('; '));
+      if (type.methods.length > 5) {
+        parts.push(`; ... (${type.methods.length - 5} more)`);
+      }
+      parts.push(' }');
     }
 
-    logger.debug(
-      `[ContextEnricher] Extracted ${types.length} types: ` +
-      `${interfaceCount} interfaces, ${typeCount} type aliases, ${enumCount} enums`
-    );
-
-    return types;
+    return parts.join('');
   }
 
   /**

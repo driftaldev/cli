@@ -8,26 +8,32 @@ import {
 
 /**
  * Generic parser for unsupported languages
- * Provides basic extraction using common patterns
+ *
+ * This parser explicitly disables code analysis for languages that do not have AST-based parsers.
+ * Supported languages (with AST parsers): TypeScript, JavaScript, Rust, Python, Go
+ * Unsupported languages (disabled): Java, Ruby, PHP, C#, Swift, Kotlin, C, C++, and others
+ *
+ * For unsupported languages, this parser returns empty results instead of using
+ * unreliable regex-based parsing, prioritizing accuracy over partial analysis.
  */
 export class GenericParser extends LanguageParser {
   parseImports(): Import[] {
-    // Generic parser doesn't extract imports
+    // Parsing disabled for unsupported languages - AST parser not available
     return [];
   }
 
   parseTypes(): TypeDefinition[] {
-    // Generic parser doesn't extract types
+    // Parsing disabled for unsupported languages - AST parser not available
     return [];
   }
 
   parseExports(): Export[] {
-    // Generic parser doesn't extract exports
+    // Parsing disabled for unsupported languages - AST parser not available
     return [];
   }
 
   parseFunctions(): Method[] {
-    // Generic parser doesn't extract functions
+    // Parsing disabled for unsupported languages - AST parser not available
     return [];
   }
 }

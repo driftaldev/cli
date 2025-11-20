@@ -241,8 +241,7 @@ ${context.changedCode}
       });
     }
 
-    prompt +=
-      "\nUse the detectVulnerabilities tool to scan for common security issues such as:\n";
+    prompt += "\nScan for common security issues such as:\n";
     prompt += "- SQL injection, XSS, command injection\n";
     prompt += "- Authentication/authorization bypass\n";
     prompt += "- Insecure data handling (secrets, sensitive data)\n";
@@ -435,7 +434,7 @@ ${context.changedCode}
       });
     }
 
-    prompt += "\nUse the estimateComplexity tool to analyze:\n";
+    prompt += "\nAnalyze:\n";
     prompt += "- Time complexity (loops, recursion, nested operations)\n";
     prompt += "- Memory usage patterns\n";
     prompt += "- Unnecessary computations or allocations\n";

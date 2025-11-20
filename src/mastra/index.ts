@@ -4,7 +4,6 @@ import { createPerformanceAgent } from "./agents/performance-agent.js";
 import { createLogicAgent } from "./agents/logic-agent.js";
 import { createReviewWorkflow } from "./workflows/review-workflow.js";
 import { ReviewMemory } from "./memory/review-memory.js";
-import { codeAnalysisTools } from "./tools/code-analysis-tools.js";
 import { gitTools } from "./tools/git-tools.js";
 import { loadAuthTokens } from "../utils/token-manager.js";
 import type { AgentModelConfig } from "./types.js";
@@ -195,7 +194,6 @@ export class MastraReviewOrchestrator {
    */
   getTools() {
     return {
-      ...codeAnalysisTools,
       ...gitTools,
     };
   }

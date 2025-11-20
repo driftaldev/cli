@@ -41,12 +41,21 @@ export class PythonParser extends LanguageParser {
         }
 
         // Handle: from module import (foo, bar, baz) - multiline
+        // Use proper parenthesis depth tracking instead of string matching
         let fullImportPart = importPart;
-        if (importPart.includes('(') && !importPart.includes(')')) {
-          // Multiline import, collect until closing paren
+        let parenDepth = (importPart.match(/\(/g) || []).length - (importPart.match(/\)/g) || []).length;
+
+        if (parenDepth > 0) {
+          // Multiline import, collect until parentheses are balanced
           let j = i + 1;
-          while (j < lines.length && !fullImportPart.includes(')')) {
-            fullImportPart += ' ' + lines[j].trim();
+          while (j < lines.length && parenDepth > 0) {
+            const nextLine = lines[j].trim();
+            fullImportPart += ' ' + nextLine;
+
+            // Update parenthesis depth
+            parenDepth += (nextLine.match(/\(/g) || []).length;
+            parenDepth -= (nextLine.match(/\)/g) || []).length;
+
             j++;
           }
           i = j - 1; // Skip processed lines

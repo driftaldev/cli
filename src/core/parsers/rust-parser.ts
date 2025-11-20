@@ -8,6 +8,7 @@ import {
   Parameter,
   Property,
 } from './language-parser';
+import { getRustFunctionModifiers } from '../../utils/rust-ast-helpers.js';
 
 export class RustParser extends LanguageParser {
   parseImports(): Import[] {
@@ -268,14 +269,16 @@ export class RustParser extends LanguageParser {
       const params = match[3];
       const returnType = match[4]?.trim();
 
-      // Check if async
-      const precedingCode = code.substring(Math.max(0, match.index - 50), match.index);
-      const isAsync = precedingCode.includes('async');
+      // Use AST-based detection instead of string matching
+      const modifiers = getRustFunctionModifiers(code, name);
+      const isAsync = modifiers.isAsync;
 
-      // Determine visibility
+      // Map Rust visibility to our schema
       let visibility: 'public' | 'private' | 'protected' = 'private';
-      if (precedingCode.includes('pub')) {
+      if (modifiers.visibility === 'public' || modifiers.visibility === 'pub(crate)') {
         visibility = 'public';
+      } else if (modifiers.visibility === 'pub(super)') {
+        visibility = 'protected';
       }
 
       functions.push({

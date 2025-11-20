@@ -3,6 +3,8 @@
  * Ranks context by importance to avoid token bloat
  */
 
+import { findTypeReferences, isTypeExported } from "../../utils/ast-helpers.js";
+
 export interface RankableItem {
   content: string;
   metadata?: Record<string, any>;
@@ -151,16 +153,33 @@ export class RelevanceRanker {
         reasons.push(`used ${usageMatches} times`);
       }
 
-      // Boost for interface/type annotations
-      if (changedCode.includes(`: ${type.name}`) || changedCode.includes(`<${type.name}>`)) {
-        score += 0.4;
-        reasons.push('type annotation');
+      // Use AST-based type reference detection instead of string matching
+      try {
+        const typeRefs = findTypeReferences(changedCode, type.name);
+        if (typeRefs.length > 0) {
+          score += 0.4;
+          reasons.push(`type annotation (${typeRefs.length} refs)`);
+        }
+      } catch (error) {
+        // Fall back to simple string matching if AST parsing fails
+        if (changedCode.includes(`: ${type.name}`) || changedCode.includes(`<${type.name}>`)) {
+          score += 0.4;
+          reasons.push('type annotation');
+        }
       }
 
-      // Boost for exported types
-      if (type.definition.includes('export')) {
-        score += 0.2;
-        reasons.push('exported type');
+      // Use AST-based export detection instead of string matching
+      try {
+        if (isTypeExported(type.definition, type.name)) {
+          score += 0.2;
+          reasons.push('exported type');
+        }
+      } catch (error) {
+        // Fall back to simple string matching if AST parsing fails
+        if (type.definition.includes('export')) {
+          score += 0.2;
+          reasons.push('exported type');
+        }
       }
 
       // Boost based on global usage count

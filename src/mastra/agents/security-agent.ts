@@ -1,6 +1,5 @@
 import { Agent } from "@mastra/core";
 import type { AgentModelConfig } from "../types.js";
-import { codeAnalysisTools } from "../tools/code-analysis-tools.js";
 import { logger } from "../../utils/logger.js";
 import type { EnrichedContext } from "../../core/review/context-strategies.js";
 import { SecurityContextStrategy } from "../../core/review/context-strategies.js";
@@ -150,9 +149,6 @@ export function createSecurityAgent(
     name: "security-analyzer",
     instructions,
     model: modelConfig,
-    tools: {
-      detectVulnerabilities: codeAnalysisTools.detectVulnerabilities,
-    },
   });
 }
 
@@ -189,7 +185,7 @@ Code:
 ${context.changedCode}
 \`\`\`
 
-Use the detectVulnerabilities tool to scan for common security issues, then systematically check for:
+Systematically check for:
 
 1. **Injection Vulnerabilities:**
    - SQL injection (string concatenation in queries)

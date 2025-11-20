@@ -1,6 +1,5 @@
 import { Agent } from "@mastra/core";
 import type { AgentModelConfig } from "../types.js";
-import { codeAnalysisTools } from "../tools/code-analysis-tools.js";
 import { logger } from "../../utils/logger.js";
 import type { EnrichedContext } from "../../core/review/context-strategies.js";
 import { LogicContextStrategy } from "../../core/review/context-strategies.js";
@@ -147,9 +146,6 @@ export function createLogicAgent(
     name: "logic-analyzer",
     instructions,
     model: modelConfig,
-    tools: {
-      analyzeComplexity: codeAnalysisTools.analyzeComplexity,
-    },
   });
 }
 
@@ -186,7 +182,7 @@ Code:
 ${context.changedCode}
 \`\`\`
 
-Use the analyzeComplexity tool if needed, then systematically check for:
+Systematically check for:
 
 1. **Async/Promise Issues:**
    - Missing await keywords on async function calls (look for functions returning Promises)

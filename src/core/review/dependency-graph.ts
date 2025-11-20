@@ -7,6 +7,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { logger } from "../../utils/logger";
 import { MossClient } from "../indexer/moss-client.js";
+import { isFunctionAsync } from "../../utils/ast-helpers.js";
 
 /**
  * Log import resolution details to debug folder
@@ -352,9 +353,8 @@ export class DependencyGraphBuilder {
       const generics = match[2] || "";
       const params = match[3];
       const returnType = match[4]?.trim() || "";
-      const isAsync = content
-        .substring(Math.max(0, match.index - 10), match.index)
-        .includes("async");
+      // Use AST-based async detection instead of string matching
+      const isAsync = isFunctionAsync(content, name);
 
       signatures.push(
         `${isAsync ? "async " : ""}function ${name}${generics}(${params})${returnType ? `: ${returnType}` : ""}`

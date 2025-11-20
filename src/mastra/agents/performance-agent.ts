@@ -1,6 +1,5 @@
 import { Agent } from "@mastra/core";
 import type { AgentModelConfig } from "../types.js";
-import { codeAnalysisTools } from "../tools/code-analysis-tools.js";
 import { logger } from "../../utils/logger.js";
 import type { EnrichedContext } from "../../core/review/context-strategies.js";
 import { PerformanceContextStrategy } from "../../core/review/context-strategies.js";
@@ -139,10 +138,6 @@ export function createPerformanceAgent(
     name: "performance-analyzer",
     instructions,
     model: modelConfig,
-    tools: {
-      analyzeComplexity: codeAnalysisTools.analyzeComplexity,
-      estimatePerformance: codeAnalysisTools.estimatePerformance,
-    },
   });
 }
 
@@ -179,7 +174,7 @@ Code:
 ${context.changedCode}
 \`\`\`
 
-Use the analyzeComplexity and estimatePerformance tools to assess the code, then systematically check for:
+Systematically check for:
 
 1. **Algorithm Complexity:**
    - Nested loops (O(n²) or worse)

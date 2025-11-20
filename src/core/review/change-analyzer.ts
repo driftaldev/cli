@@ -1,4 +1,5 @@
 import type { GitDiff, DiffFile } from "../../utils/git.js";
+import { getComplexityScore, hasPublicMethod, hasBreakingChange } from "../../utils/ast-helpers.js";
 
 export interface ChangeAnalysis {
   type: 'feature' | 'bugfix' | 'refactor' | 'docs' | 'test' | 'chore';
@@ -116,39 +117,39 @@ export class ChangeAnalyzer {
   }
 
   /**
-   * Calculate complexity for a single file
+   * Calculate complexity for a single file using AST-based analysis
    */
   private calculateFileComplexity(file: DiffFile): number {
-    let complexity = 0;
+    // Collect all added/modified code
+    const changedLines: string[] = [];
 
     for (const chunk of file.chunks) {
       for (const line of chunk.lines) {
         if (line.type === 'added' || line.type === 'removed') {
-          // Increased complexity for nested structures
-          const indentLevel = line.content.search(/\S/);
-          complexity += Math.floor(indentLevel / 2);
-
-          // Keywords that indicate complexity
-          const complexKeywords = [
-            'async', 'await', 'promise', 'callback',
-            'try', 'catch', 'throw',
-            'if', 'else', 'switch', 'case',
-            'for', 'while', 'do',
-            'class', 'interface', 'type',
-            'function', 'const', 'let', 'var'
-          ];
-
-          const lowerContent = line.content.toLowerCase();
-          for (const keyword of complexKeywords) {
-            if (lowerContent.includes(keyword)) {
-              complexity += 0.5;
-            }
-          }
+          changedLines.push(line.content);
         }
       }
     }
 
-    return complexity;
+    if (changedLines.length === 0) {
+      return 0;
+    }
+
+    // Combine changed code for AST analysis
+    const changedCode = changedLines.join('\n');
+
+    // Determine language from file extension
+    const ext = file.path.split('.').pop()?.toLowerCase();
+    const language = ext === 'js' || ext === 'jsx' ? 'javascript' : 'typescript';
+
+    try {
+      // Use AST-based complexity calculation instead of string matching
+      return getComplexityScore(changedCode, language);
+    } catch (error) {
+      // Fallback to simple line count if AST parsing fails
+      // (e.g., for incomplete code fragments in diffs)
+      return changedLines.length * 0.5;
+    }
   }
 
   /**
@@ -192,35 +193,62 @@ export class ChangeAnalyzer {
   }
 
   /**
-   * Detect if changes include breaking changes
+   * Detect if changes include breaking changes using AST-based analysis
    */
   detectBreakingChanges(diff: GitDiff): boolean {
     for (const file of diff.files) {
       // Deleted files might break imports
       if (file.status === 'deleted') return true;
 
+      // Skip non-TypeScript/JavaScript files
+      const ext = file.path.split('.').pop()?.toLowerCase();
+      if (!ext || !['ts', 'tsx', 'js', 'jsx'].includes(ext)) {
+        continue;
+      }
+
       // Check for removed exports or public APIs
       for (const chunk of file.chunks) {
+        const removedLines: string[] = [];
+        const addedLines: string[] = [];
+
+        // Collect removed and added code
         for (const line of chunk.lines) {
           if (line.type === 'removed') {
             const content = line.content.trim();
 
-            // Removed exports
+            // Quick check: Removed exports are likely breaking
             if (content.startsWith('export ')) return true;
 
-            // Removed public methods/functions
-            if (content.includes('public ')) return true;
+            removedLines.push(content);
+          } else if (line.type === 'added') {
+            addedLines.push(line.content.trim());
+          }
+        }
 
-            // Changed function signatures
-            if (content.includes('function ') || content.includes('=>')) {
-              // Check if there's a corresponding addition with different signature
-              const addedLine = chunk.lines.find(l =>
-                l.type === 'added' && l.content.includes(content.split('(')[0])
-              );
-              if (addedLine && addedLine.content !== content) {
+        if (removedLines.length === 0) continue;
+
+        // Combine lines for AST analysis
+        const removedCode = removedLines.join('\n');
+        const addedCode = addedLines.join('\n');
+
+        try {
+          // Check if removed code contains public methods/functions
+          if (hasPublicMethod(removedCode)) {
+            // If there's added code, check if it's a breaking change
+            if (addedCode) {
+              if (hasBreakingChange(removedCode, addedCode)) {
                 return true;
               }
+            } else {
+              // Public method removed with no replacement
+              return true;
             }
+          }
+        } catch (error) {
+          // AST parsing failed (e.g., incomplete code fragments)
+          // Fall back to simple heuristic: if we removed something that looks like a function/method
+          if (removedCode.match(/\bfunction\s+\w+\s*\(/) || removedCode.match(/\w+\s*\([^)]*\)\s*[:{]/)) {
+            return true;
           }
         }
       }

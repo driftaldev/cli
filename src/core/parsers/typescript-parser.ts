@@ -8,6 +8,7 @@ import {
   Parameter,
   Property,
 } from './language-parser';
+import { isFunctionAsync } from '../../utils/ast-helpers.js';
 
 export class TypeScriptParser extends LanguageParser {
   parseImports(): Import[] {
@@ -316,7 +317,8 @@ export class TypeScriptParser extends LanguageParser {
       const generics = match[2];
       const params = match[3];
       const returnType = match[4]?.trim();
-      const isAsync = code.substring(Math.max(0, match.index - 10), match.index).includes('async');
+      // Use AST-based async detection instead of string matching
+      const isAsync = isFunctionAsync(code, name);
 
       functions.push({
         name,

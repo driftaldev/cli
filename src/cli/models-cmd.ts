@@ -229,7 +229,7 @@ async function handleModelsAvailable() {
 
     const openrouterModels = models.filter((model) => model.provider === "openrouter");
     if (openrouterModels.length > 0) {
-      console.log(chalk.bold("OpenRouter Models:"));
+      console.log(chalk.bold("Anthropic Models:"));
       for (const model of openrouterModels) {
         console.log(`  ${chalk.green("•")} ${chalk.bold(model.name)}`);
         console.log(`    ${chalk.gray(model.description)}`);

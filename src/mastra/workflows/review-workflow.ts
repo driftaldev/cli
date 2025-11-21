@@ -14,6 +14,12 @@ import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
 import { runSecurityAnalysisWithContext } from "../agents/security-agent.js";
 import { runPerformanceAnalysisWithContext } from "../agents/performance-agent.js";
 import { runLogicAnalysisWithContext } from "../agents/logic-agent.js";
+import {
+  createSearchCodeTool,
+  SearchCache,
+  createSearchCounter,
+} from "../tools/index.js";
+import type { QueryRouter } from "../../core/query/query-router.js";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -121,6 +127,72 @@ END OF CONTEXT LOG
     logger.debug(`[ContextLogger] Context logged to: ${logFilePath}`);
   } catch (error) {
     logger.error(`[ContextLogger] Failed to log context: ${error}`);
+  }
+}
+
+/**
+ * Utility function to log tool calls to .driftal folder
+ */
+export async function logToolCallToFile(
+  filePath: string,
+  toolName: string,
+  query: string,
+  result: any
+): Promise<void> {
+  // Only log tool calls when DRIFTAL_DEBUG=1 is set
+  if (process.env.DRIFTAL_DEBUG !== "1") {
+    return;
+  }
+
+  try {
+    // Get the working directory (where CLI is run from)
+    const workingDir = process.cwd();
+    const toolCallsDir = path.join(
+      workingDir,
+      ".driftal",
+      "debug",
+      "logs",
+      "tool-calls"
+    );
+
+    // Ensure tool-calls directory exists
+    await fs.mkdir(toolCallsDir, { recursive: true });
+
+    // Create filename: <filename>_tool_call_<timestamp>.txt
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const baseFileName = path.basename(filePath).replace(/\//g, "_");
+    const logFileName = `${baseFileName}_tool_call_${timestamp}.txt`;
+    const logFilePath = path.join(toolCallsDir, logFileName);
+
+    // Format the tool call log
+    const logContent = `
+================================================================================
+TOOL CALL LOG
+================================================================================
+FILE: ${filePath}
+TOOL: ${toolName}
+TIMESTAMP: ${new Date().toISOString()}
+================================================================================
+
+QUERY:
+--------------------------------------------------------------------------------
+${query}
+
+================================================================================
+RESULT:
+================================================================================
+${JSON.stringify(result, null, 2)}
+
+================================================================================
+END OF TOOL CALL LOG
+================================================================================
+`;
+
+    // Write to file
+    await fs.writeFile(logFilePath, logContent, "utf-8");
+    logger.debug(`[ToolCallLogger] Tool call logged to: ${logFilePath}`);
+  } catch (error) {
+    logger.error(`[ToolCallLogger] Failed to log tool call: ${error}`);
   }
 }
 
@@ -345,6 +417,7 @@ export const runAllAgentsInParallelStep = createStep({
     securityAgent: z.any(),
     performanceAgent: z.any(),
     logicAgent: z.any(),
+    queryRouter: z.any().optional(),
     onProgress: z.function().optional(),
     analysis: z.any().optional(),
   }),
@@ -360,15 +433,19 @@ export const runAllAgentsInParallelStep = createStep({
       securityAgent,
       performanceAgent,
       logicAgent,
+      queryRouter,
       onProgress,
     } = inputData;
+
+    // Create per-file search caches (shared across all agents for the same file)
+    const fileSearchCaches = new Map<string, SearchCache>();
 
     // Helper function to run an agent on all files in parallel
     const runAgentOnFiles = async (
       agent: any,
       agentName: string,
       strategyType: "security" | "performance" | "logic",
-      analysisFn: (agent: any, context: any) => Promise<ReviewIssue[]>
+      analysisFn: (agent: any, context: any, searchTool?: any) => Promise<ReviewIssue[]>
     ): Promise<ReviewIssue[]> => {
       const ranker = new RelevanceRanker();
       const strategy = ContextStrategyFactory.getStrategy(strategyType);
@@ -419,9 +496,35 @@ export const runAllAgentsInParallelStep = createStep({
           // Log the context being passed to the agent
           await logContextToFile(file.path, agentName, context);
 
+          // Create or get search cache for this file (shared across agents)
+          let searchCache = fileSearchCaches.get(file.path);
+          if (!searchCache) {
+            searchCache = new SearchCache(30); // 30 minute TTL
+            fileSearchCaches.set(file.path, searchCache);
+          }
+
+          // Create search tool if queryRouter is available
+          let searchTool = undefined;
+          if (queryRouter) {
+            const searchCounter = createSearchCounter(5); // 5 searches per agent per file
+            searchTool = createSearchCodeTool(
+              queryRouter,
+              searchCache,
+              searchCounter,
+              file.path // Pass fileName for tool call logging
+            );
+            logger.debug(
+              `[${agentName}:${file.path}] Created search_code tool with 5-search budget`
+            );
+          } else {
+            logger.debug(
+              `[${agentName}:${file.path}] No QueryRouter available, skipping search_code tool`
+            );
+          }
+
           // Run the agent-specific analysis function
           try {
-            const fileIssues = await analysisFn(agent, context);
+            const fileIssues = await analysisFn(agent, context, searchTool);
             return fileIssues;
           } catch (error) {
             logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);
@@ -628,6 +731,7 @@ export function createReviewWorkflow() {
       logicAgent: z.any(),
       issueRanker: z.any(),
       contextEnricher: z.any().optional(),
+      queryRouter: z.any().optional(), // QueryRouter for search_code tool
       repoPath: z.string().optional(),
       repoName: z.string().optional(),
       onProgress: z.function().optional(),

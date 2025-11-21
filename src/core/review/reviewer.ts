@@ -103,6 +103,7 @@ export class CodeReviewer {
         logicAgent: this.mastraOrchestrator.logicAgent,
         issueRanker: this.issueRanker,
         contextEnricher: this.contextEnricher,
+        queryRouter: this.mastraOrchestrator.getQueryRouter(), // For search_code tool
         repoPath,
         repoName,
         onProgress,

@@ -74,6 +74,42 @@ When analyzing code, you will receive enriched context including:
    - Check DEPENDENCIES to understand trust boundaries
    - Missing authorization on sensitive endpoints/functions
 
+## SEARCH_CODE TOOL - Use Reactively & Strategically
+
+You have access to the **search_code** tool with a **3-5 search budget per file**.
+
+### WHEN TO USE SEARCH (Reactive Strategy):
+
+**DO search when you identify:**
+- Authentication/authorization patterns that should be verified for consistency across the codebase
+- Crypto usage (MD5, SHA1, weak algorithms) - search to find if used elsewhere
+- Database query construction - search for similar patterns to check for injection vulnerabilities
+- Input validation patterns - verify if validation is applied consistently
+- Session management - check how tokens/sessions are handled across the codebase
+- File system operations with user input - search for path traversal patterns
+- Eval/exec usage - find all dangerous code execution patterns
+
+**Example searches:**
+- "bcrypt password hashing" - when you see password storage to verify it's done correctly elsewhere
+- "SQL query WHERE user" - when you suspect SQL injection to find similar vulnerable patterns
+- "JWT token validation" - when reviewing auth code to check consistency
+- "crypto.createHash('md5')" - when you find weak crypto to identify all usages
+
+### WHEN NOT TO SEARCH:
+
+- Don't search for every minor issue - you have limited budget (3-5 searches)
+- Don't search if the enriched context (IMPORTS, DEPENDENCIES) already provides the answer
+- Don't search for general information - only for specific security patterns
+
+### SEARCH STRATEGICALLY:
+
+1. **First**, analyze the code with provided context (IMPORTS, TYPE DEFINITIONS, DEPENDENCIES)
+2. **Then**, identify 2-3 critical security concerns that need verification
+3. **Finally**, use search_code to verify these concerns across the codebase
+4. Return your analysis with findings from both context and search results
+
+**Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
+
 ## OWASP Top 10 Focus Areas:
 
 1. **Injection** (SQL, NoSQL, Command, XSS) - cross-check with IMPORTS
@@ -159,7 +195,8 @@ export async function runSecurityAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string }
+    | { changedCode: string; fileName: string; language: string },
+  searchTool?: any
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "typeDefinitions" in context;
@@ -232,7 +269,7 @@ Return ONLY valid JSON with your findings.`;
   );
 
   try {
-    const result = await agent.generate(prompt, {
+    const generateOptions: any = {
       structuredOutput: {
         schema: SecurityIssuesResponseSchema,
         errorStrategy: "warn",
@@ -241,7 +278,19 @@ Return ONLY valid JSON with your findings.`;
       modelSettings: {
         temperature: 1,
       },
-    });
+    };
+
+    // Add search_code tool if available
+    if (searchTool) {
+      generateOptions.clientTools = {
+        search_code: searchTool,
+      };
+      logger.debug(
+        `[Security Agent] search_code tool enabled for ${context.fileName}`
+      );
+    }
+
+    const result = await agent.generate(prompt, generateOptions);
 
     logger.debug("[Security Agent] Raw LLM response:", result.text);
 

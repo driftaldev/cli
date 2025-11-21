@@ -187,7 +187,6 @@ async function handleModelsAvailable() {
     // Fetch models from backend
     const models = await fetchSupportedModels();
 
-
     const geminiModels = models.filter((model) => model.provider === "gemini");
     console.log(chalk.cyan("\nAvailable Models\n"));
 
@@ -227,7 +226,9 @@ async function handleModelsAvailable() {
       }
     }
 
-    const openrouterModels = models.filter((model) => model.provider === "openrouter");
+    const openrouterModels = models.filter(
+      (model) => model.provider === "openrouter"
+    );
     if (openrouterModels.length > 0) {
       console.log(chalk.bold("Anthropic Models:"));
       for (const model of openrouterModels) {

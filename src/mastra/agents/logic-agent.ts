@@ -67,6 +67,43 @@ When analyzing code, you will receive enriched context including:
    - Infinite loops
    - Missing return statements
 
+## SEARCH_CODE TOOL - Use Reactively & Strategically
+
+You have access to the **search_code** tool with a **3-5 search budget per file**.
+
+### WHEN TO USE SEARCH (Reactive Strategy):
+
+**DO search when you identify:**
+- Missing await on async functions - search to verify function signature returns Promise
+- Null/undefined handling - check how similar nullable patterns are handled elsewhere
+- Error handling patterns - verify if try/catch is used consistently for similar operations
+- Function signature mismatches - search for function definition to verify parameters/return type
+- Edge case handling - find how empty arrays, null values, boundary conditions are handled elsewhere
+- Type usage - search for type definition to understand correct usage
+- Similar function calls - verify if other call sites handle nullability/errors correctly
+
+**Example searches:**
+- "function getUserById" - when you see it called without await to verify if it's async
+- "array.length === 0" - when you see array access without checks to find guard patterns
+- "try catch database" - when you see database operations without error handling
+- "if (user === null)" - when reviewing nullable handling to verify consistency
+- "Promise.reject Error" - when checking error propagation patterns
+
+### WHEN NOT TO SEARCH:
+
+- Don't search for every potential bug - you have limited budget (3-5 searches)
+- Don't search if the enriched context (IMPORTS, TYPE DEFINITIONS) already shows the function signature
+- Don't search for general information - only for specific patterns or definitions
+
+### SEARCH STRATEGICALLY:
+
+1. **First**, analyze the code with provided context (IMPORTS, TYPE DEFINITIONS, DEPENDENCIES)
+2. **Then**, identify 2-3 critical bugs or missing checks that need verification
+3. **Finally**, use search_code to verify function signatures, patterns, or handling approaches
+4. Return your analysis with findings from both context and search results
+
+**Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
+
 ## Classic Bug Categories to Check:
 
 - **Null/undefined handling** - especially when imports show nullable returns
@@ -156,7 +193,8 @@ export async function runLogicAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string }
+    | { changedCode: string; fileName: string; language: string },
+  searchTool?: any
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "relatedTests" in context;
@@ -223,7 +261,7 @@ Return ONLY valid JSON with your findings.`;
   );
 
   try {
-    const result = await agent.generate(prompt, {
+    const generateOptions: any = {
       structuredOutput: {
         schema: LogicIssuesResponseSchema,
         errorStrategy: "warn",
@@ -232,7 +270,19 @@ Return ONLY valid JSON with your findings.`;
       modelSettings: {
         temperature: 1,
       },
-    });
+    };
+
+    // Add search_code tool if available
+    if (searchTool) {
+      generateOptions.clientTools = {
+        search_code: searchTool,
+      };
+      logger.debug(
+        `[Logic Agent] search_code tool enabled for ${context.fileName}`
+      );
+    }
+
+    const result = await agent.generate(prompt, generateOptions);
 
     logger.debug("[Logic Agent] Raw LLM response:", result.text);
 

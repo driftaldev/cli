@@ -100,6 +100,7 @@ export class OpenAIProvider extends LLMProvider {
     }
   }
 
+  // Not needed for cloud proxy providers, hosted providers will count tokens for you
   countTokens(text: string): number {
     // Approximate token count for GPT models (~4 chars per token)
     return Math.ceil(text.length / 4);

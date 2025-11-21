@@ -61,6 +61,43 @@ When analyzing code, you will receive enriched context including:
    - Static data fetched multiple times
    - Computed values recalculated unnecessarily
 
+## SEARCH_CODE TOOL - Use Reactively & Strategically
+
+You have access to the **search_code** tool with a **3-5 search budget per file**.
+
+### WHEN TO USE SEARCH (Reactive Strategy):
+
+**DO search when you identify:**
+- Database query patterns (N+1 queries, missing indexes) - search to find similar inefficient queries
+- Loop patterns with expensive operations - check if pattern is used elsewhere
+- Async operations in loops - verify if Promise.all is used consistently
+- Large data processing - search for caching or streaming patterns in the codebase
+- Repeated API calls - check how caching is implemented elsewhere
+- Memory-intensive operations - find similar patterns and their optimizations
+- Nested loops - search for similar O(n²) patterns to recommend consistent optimization
+
+**Example searches:**
+- "Promise.all map async" - when you see sequential async operations to find better patterns
+- "database.query SELECT WHERE IN" - to check if batch queries are used instead of N+1
+- "cache.get cache.set" - when you see repeated operations to verify caching strategy
+- "for loop indexOf" - when you see O(n²) patterns to find if Sets/Maps are used elsewhere
+- "Stream pipeline transform" - when processing large data to find streaming patterns
+
+### WHEN NOT TO SEARCH:
+
+- Don't search for every performance issue - you have limited budget (3-5 searches)
+- Don't search if the enriched context (SIMILAR PATTERNS, IMPORTS) already shows better approaches
+- Don't search for general information - only for specific optimization patterns
+
+### SEARCH STRATEGICALLY:
+
+1. **First**, analyze the code with provided context (IMPORTS, SIMILAR PATTERNS, DEPENDENCIES)
+2. **Then**, identify 2-3 critical performance bottlenecks that need verification
+3. **Finally**, use search_code to find optimization patterns used elsewhere in the codebase
+4. Return your analysis with findings from both context and search results
+
+**Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
+
 ## Performance Issue Categories:
 
 - **Time complexity** (O(n²), O(n³), etc.) - identify from loops and algorithm patterns
@@ -148,7 +185,8 @@ export async function runPerformanceAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string }
+    | { changedCode: string; fileName: string; language: string },
+  searchTool?: any
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "similarPatterns" in context;
@@ -216,7 +254,7 @@ Return ONLY valid JSON with your findings.`;
   );
 
   try {
-    const result = await agent.generate(prompt, {
+    const generateOptions: any = {
       structuredOutput: {
         schema: PerformanceIssuesResponseSchema,
         errorStrategy: "warn",
@@ -225,7 +263,19 @@ Return ONLY valid JSON with your findings.`;
       modelSettings: {
         temperature: 1,
       },
-    });
+    };
+
+    // Add search_code tool if available
+    if (searchTool) {
+      generateOptions.clientTools = {
+        search_code: searchTool,
+      };
+      logger.debug(
+        `[Performance Agent] search_code tool enabled for ${context.fileName}`
+      );
+    }
+
+    const result = await agent.generate(prompt, generateOptions);
 
     logger.debug("[Performance Agent] Raw LLM response:", result.text);
 

@@ -8,6 +8,8 @@ import { gitTools } from "./tools/git-tools.js";
 import { loadAuthTokens } from "../utils/token-manager.js";
 import type { AgentModelConfig } from "./types.js";
 import type { Stack } from "../core/indexer/stack-detector.js";
+import { QueryRouter } from "../core/query/query-router.js";
+import { MossClient } from "../core/indexer/moss-client.js";
 import packageJson from "../../package.json" assert { type: "json" };
 
 const DEFAULT_PROXY_URL =
@@ -31,6 +33,7 @@ export class MastraReviewOrchestrator {
   private memory: ReviewMemory;
   private initialized: boolean = false;
   private modelConfig?: AgentModelConfig;
+  private _queryRouter?: QueryRouter;
 
   // Agents
   public securityAgent: any;
@@ -60,6 +63,9 @@ export class MastraReviewOrchestrator {
     // Resolve model configuration for agents
     this.modelConfig = await this.resolveAgentModelConfig();
 
+    // Initialize QueryRouter for search_code tool
+    await this.initializeQueryRouter();
+
     // Get stacks from config
     const stacks = this.config.stacks;
 
@@ -72,6 +78,34 @@ export class MastraReviewOrchestrator {
     this.reviewWorkflow = createReviewWorkflow();
 
     this.initialized = true;
+  }
+
+  /**
+   * Initialize QueryRouter for code search
+   */
+  private async initializeQueryRouter(): Promise<void> {
+    try {
+      // Load config to get MOSS credentials
+      const { loadConfig } = await import("../config/loader.js");
+      const config = await loadConfig();
+
+      // Create MossClient
+      const mossClient = new MossClient(
+        config.moss.project_id,
+        config.moss.project_key,
+        config.moss.index_directory
+      );
+
+      // Create QueryRouter
+      this._queryRouter = new QueryRouter(mossClient);
+    } catch (error) {
+      // Log warning but don't fail initialization
+      // The search tool will gracefully handle missing QueryRouter
+      console.warn(
+        "Failed to initialize QueryRouter for search_code tool:",
+        error
+      );
+    }
   }
 
   private async resolveAgentModelConfig(): Promise<AgentModelConfig> {
@@ -120,8 +154,7 @@ export class MastraReviewOrchestrator {
         const baseUrl = proxyUrl.endsWith("/")
           ? `${proxyUrl}v1`
           : `${proxyUrl}/v1`;
-        const selectedModel =
-          tokens.selectedModels?.primary || "openai/o3";
+        const selectedModel = tokens.selectedModels?.primary || "openai/o3";
         const { providerId, modelId } =
           this.parseModelIdentifier(selectedModel);
 
@@ -187,6 +220,13 @@ export class MastraReviewOrchestrator {
    */
   getMemory(): ReviewMemory {
     return this.memory;
+  }
+
+  /**
+   * Get QueryRouter for code search
+   */
+  getQueryRouter(): QueryRouter | undefined {
+    return this._queryRouter;
   }
 
   /**

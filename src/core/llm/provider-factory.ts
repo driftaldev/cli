@@ -2,6 +2,7 @@ import type { LLMConfig } from "../../config/schema.js";
 import { LLMProvider } from "./provider.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
+import { GeminiProvider } from "./providers/gemini.js";
 import { OllamaProvider } from "./providers/ollama.js";
 import { CloudProxyProvider } from "./providers/cloud-proxy.js";
 import { logger } from "../../utils/logger.js";
@@ -52,6 +53,8 @@ export class ProviderFactory {
         return new AnthropicProvider(config);
       case "openai":
         return new OpenAIProvider(config);
+      case "gemini":
+        return new GeminiProvider(config);
       case "ollama":
         return new OllamaProvider(config);
       default:
@@ -129,6 +132,9 @@ export class ProviderFactory {
     }
     if (config.providers.openai) {
       available.push("openai");
+    }
+    if (config.providers.gemini) {
+      available.push("gemini");
     }
     if (config.providers.ollama) {
       available.push("ollama");

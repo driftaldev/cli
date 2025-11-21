@@ -28,9 +28,9 @@ export const LLMProviderConfigSchema = z.object({
 
   // Traditional provider config (for advanced users with their own API keys)
   primary: z
-    .enum(["anthropic", "openai", "ollama", "cloud-proxy"])
+    .enum(["anthropic", "openai", "gemini", "ollama", "cloud-proxy"])
     .default("cloud-proxy"),
-  fallback: z.enum(["anthropic", "openai", "ollama"]).optional(),
+  fallback: z.enum(["anthropic", "openai", "gemini", "ollama"]).optional(),
   anthropic: z
     .object({
       apiKey: z.string().optional(),
@@ -45,6 +45,14 @@ export const LLMProviderConfigSchema = z.object({
       apiKeyEnv: z.string().default("OPENAI_API_KEY"),
       model: z.string().default("gpt-5-codex"),
       maxTokens: z.number().int().positive().default(4096),
+    })
+    .optional(),
+  gemini: z
+    .object({
+      apiKey: z.string().optional(),
+      apiKeyEnv: z.string().default("GEMINI_API_KEY"),
+      model: z.string().default("gemini-2.0-flash-exp"),
+      maxTokens: z.number().int().positive().default(8192),
     })
     .optional(),
   ollama: z

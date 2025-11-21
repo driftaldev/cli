@@ -4,6 +4,7 @@ import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { OllamaProvider } from "./providers/ollama.js";
+import { OpenRouterProvider } from "./providers/openrouter.js";
 import { CloudProxyProvider } from "./providers/cloud-proxy.js";
 import { logger } from "../../utils/logger.js";
 
@@ -57,6 +58,8 @@ export class ProviderFactory {
         return new GeminiProvider(config);
       case "ollama":
         return new OllamaProvider(config);
+      case "openrouter":
+        return new OpenRouterProvider(config);
       default:
         throw new Error(`Unknown provider: ${providerName}`);
     }
@@ -138,6 +141,9 @@ export class ProviderFactory {
     }
     if (config.providers.ollama) {
       available.push("ollama");
+    }
+    if (config.providers.openrouter) {
+      available.push("openrouter");
     }
 
     return available;

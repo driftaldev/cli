@@ -187,15 +187,15 @@ async function handleModelsAvailable() {
     // Fetch models from backend
     const models = await fetchSupportedModels();
 
+
+    const geminiModels = models.filter((model) => model.provider === "gemini");
     console.log(chalk.cyan("\nAvailable Models\n"));
 
     const anthropicModels = models.filter(
       (model) => model.provider === "anthropic"
     );
 
-    const openaiModels = models.filter(
-      (model) => model.provider === "openai"
-    );
+    const openaiModels = models.filter((model) => model.provider === "openai");
 
     if (anthropicModels.length > 0) {
       console.log(chalk.bold("Anthropic Models:"));
@@ -210,6 +210,27 @@ async function handleModelsAvailable() {
     if (openaiModels.length > 0) {
       console.log(chalk.bold("OpenAI Models:"));
       for (const model of openaiModels) {
+        console.log(`  ${chalk.green("•")} ${chalk.bold(model.name)}`);
+        console.log(`    ${chalk.gray(model.description)}`);
+        console.log(chalk.gray(`    ID: ${model.id}`));
+        console.log();
+      }
+    }
+
+    if (geminiModels.length > 0) {
+      console.log(chalk.bold("Gemini Models:"));
+      for (const model of geminiModels) {
+        console.log(`  ${chalk.green("•")} ${chalk.bold(model.name)}`);
+        console.log(`    ${chalk.gray(model.description)}`);
+        console.log(chalk.gray(`    ID: ${model.id}`));
+        console.log();
+      }
+    }
+
+    const openrouterModels = models.filter((model) => model.provider === "openrouter");
+    if (openrouterModels.length > 0) {
+      console.log(chalk.bold("OpenRouter Models:"));
+      for (const model of openrouterModels) {
         console.log(`  ${chalk.green("•")} ${chalk.bold(model.name)}`);
         console.log(`    ${chalk.gray(model.description)}`);
         console.log(chalk.gray(`    ID: ${model.id}`));

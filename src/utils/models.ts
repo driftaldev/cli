@@ -33,9 +33,7 @@ export async function fetchSupportedModels(): Promise<ModelInfo[]> {
   // Check if token is expired and refresh if needed
   if (isTokenExpired(tokens)) {
     if (tokens.refreshToken) {
-      logger.debug(
-        "Token expired, refreshing before fetching models..."
-      );
+      logger.debug("Token expired, refreshing before fetching models...");
       const refreshResult = await refreshAccessToken(tokens.refreshToken);
       if (refreshResult.success && refreshResult.tokens) {
         tokens = refreshResult.tokens;
@@ -150,7 +148,3 @@ export async function fetchSupportedModels(): Promise<ModelInfo[]> {
     throw new Error("Unknown error while fetching models");
   }
 }
-
-
-
-

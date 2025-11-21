@@ -121,7 +121,7 @@ export class MastraReviewOrchestrator {
           ? `${proxyUrl}v1`
           : `${proxyUrl}/v1`;
         const selectedModel =
-          tokens.selectedModels?.primary || "openai/gpt-5-codex";
+          tokens.selectedModels?.primary || "openai/o3";
         const { providerId, modelId } =
           this.parseModelIdentifier(selectedModel);
 

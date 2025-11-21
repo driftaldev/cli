@@ -178,8 +178,8 @@ async function startCallbackServer(state: string): Promise<{
           createdAt: Date.now(),
           updatedAt: Date.now(),
           selectedModels: {
-            primary: "gpt-5-codex",
-            fallback: "o4-mini",
+            primary: "o3",
+            fallback: "gpt-5.1",
           },
         };
 

@@ -101,7 +101,7 @@ export class CloudProxyProvider extends LLMProvider {
 
     // Get model from auth.json, fallback to default
     const model =
-      this.tokens?.selectedModels?.primary || "claude-3-5-sonnet-20241022";
+      this.tokens?.selectedModels?.primary || "o3";
 
     return model;
   }

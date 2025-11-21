@@ -33,7 +33,7 @@ export class GeminiProvider extends LLMProvider {
     }
 
     this.client = new GoogleGenAI({ apiKey });
-    this.modelName = geminiConfig.model || "gemini-2.0-flash-exp";
+    this.modelName = geminiConfig.model || "gemini-3-pro-preview";
     this.maxTokens = geminiConfig.maxTokens || 8192;
   }
 
@@ -50,16 +50,14 @@ export class GeminiProvider extends LLMProvider {
       // Combine system messages into one
       const systemPrompt = systemMessages.map((m) => m.content).join("\n\n");
 
-      // Get the model instance
-      const model = this.client.models.get(this.modelName);
-
       // Transform messages to Gemini format (use "model" instead of "assistant")
       const contents = conversationMessages.map((m) => ({
         role: m.role === "assistant" ? ("model" as const) : ("user" as const),
         parts: [{ text: m.content }],
       }));
 
-      const response = await model.generateContent({
+      const response = await this.client.models.generateContent({
+        model: this.modelName,
         contents,
         ...(systemPrompt && {
           systemInstruction: {
@@ -72,14 +70,10 @@ export class GeminiProvider extends LLMProvider {
         },
       });
 
-      const candidate = response.candidates?.[0];
-      if (!candidate) {
+      const content = response.text;
+      if (!content) {
         throw new Error("No response generated from Gemini");
       }
-
-      const content = candidate.content.parts
-        .map((part) => part.text)
-        .join("");
 
       return {
         content,
@@ -89,7 +83,7 @@ export class GeminiProvider extends LLMProvider {
           totalTokens: response.usageMetadata?.totalTokenCount || 0,
         },
         model: this.modelName,
-        finishReason: this.mapFinishReason(candidate.finishReason),
+        finishReason: this.mapFinishReason(response.candidates?.[0]?.finishReason),
       };
     });
   }
@@ -104,16 +98,14 @@ export class GeminiProvider extends LLMProvider {
 
     const systemPrompt = systemMessages.map((m) => m.content).join("\n\n");
 
-    // Get the model instance
-    const model = this.client.models.get(this.modelName);
-
     // Transform messages to Gemini format
     const contents = conversationMessages.map((m) => ({
       role: m.role === "assistant" ? ("model" as const) : ("user" as const),
       parts: [{ text: m.content }],
     }));
 
-    const stream = await model.generateContentStream({
+    const stream = await this.client.models.generateContentStream({
+      model: this.modelName,
       contents,
       ...(systemPrompt && {
         systemInstruction: {

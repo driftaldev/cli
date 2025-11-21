@@ -51,7 +51,7 @@ export const LLMProviderConfigSchema = z.object({
     .object({
       apiKey: z.string().optional(),
       apiKeyEnv: z.string().default("GEMINI_API_KEY"),
-      model: z.string().default("gemini-2.0-flash-exp"),
+      model: z.string().default("gemini-3-pro-preview"),
       maxTokens: z.number().int().positive().default(8192),
     })
     .optional(),

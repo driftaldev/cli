@@ -6,7 +6,10 @@ import { SecurityContextStrategy } from "../../core/review/context-strategies.js
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
-import { SecurityIssuesResponseSchema } from "../schemas/issue-schema.js";
+import {
+  createOutputParserAgent,
+  parseSecurityReport,
+} from "./output-parser-agent.js";
 
 const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
@@ -109,6 +112,12 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 4. Return your analysis with findings from both context and search results
 
 **Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
+
+## CRITICAL INSTRUCTION:
+You MUST verify your findings using the available tools (search_code, read_test_file, etc.) before reporting them.
+- If you suspect an injection vulnerability, use search_code to check how user input is sanitized elsewhere.
+- If you suspect an auth bypass, use find_all_usages to see if the auth middleware is consistently applied.
+- Do NOT guess. Prove it with tools.
 
 ## ADDITIONAL TOOLS - Use Reactively
 
@@ -214,6 +223,7 @@ export function createSecurityAgent(
     name: "security-analyzer",
     instructions,
     model: modelConfig,
+    maxSteps: 5, // Enable multi-step execution for tools
   };
 
   // Add tools if provided
@@ -290,7 +300,7 @@ Systematically check for:
    - Missing rate limiting
 
 Focus on real, exploitable vulnerabilities. Avoid false positives.
-Return ONLY valid JSON with your findings.`;
+Provide a detailed report of your findings.`;
     logger.debug(
       `[Security Agent] Using BASIC context for ${context.fileName}`
     );
@@ -304,28 +314,34 @@ Return ONLY valid JSON with your findings.`;
   );
 
   try {
+    // STEP 1: Generate Analysis Report (Text)
     const generateOptions: any = {
-      structuredOutput: {
-        schema: SecurityIssuesResponseSchema,
-        errorStrategy: "warn",
-        jsonPromptInjection: true,
-      },
       modelSettings: {
-        temperature: 1,
+        temperature: 0.5,
       },
     };
 
     const result = await agent.generate(prompt, generateOptions);
 
-    logger.debug("[Security Agent] Raw LLM response:", result.text);
+    logger.debug("[Security Agent] Raw Analysis Report:", result.text);
+    await logLLMResponseToFile(
+      context.fileName,
+      "Security_Report",
+      result.text
+    );
 
-    // Log LLM response to file
-    await logLLMResponseToFile(context.fileName, "Security", result.text);
+    // STEP 2: Parse Report into JSON
+    // @ts-ignore - Model config type compatibility
+    const parserAgent = createOutputParserAgent(agent.model);
+    const issues = await parseSecurityReport(parserAgent, result.text);
 
-    // Access structured output directly from result.object
-    if (result.object && result.object.issues) {
-      const issues = result.object.issues;
+    await logLLMResponseToFile(
+      context.fileName,
+      "Security_JSON",
+      JSON.stringify(issues, null, 2)
+    );
 
+    if (issues.length > 0) {
       // Ensure all issues have required fields with defaults
       const normalizedIssues = issues.map((issue: any) => ({
         ...issue,
@@ -342,7 +358,7 @@ Return ONLY valid JSON with your findings.`;
       return normalizedIssues;
     }
 
-    logger.debug("[Security Agent] No issues found in structured output");
+    logger.debug("[Security Agent] No issues found in parsed report");
     return [];
   } catch (error: any) {
     // Check if this is a structured output validation error

@@ -6,7 +6,10 @@ import { PerformanceContextStrategy } from "../../core/review/context-strategies
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
-import { PerformanceIssuesResponseSchema } from "../schemas/issue-schema.js";
+import {
+  createOutputParserAgent,
+  parsePerformanceReport,
+} from "./output-parser-agent.js";
 
 const PERFORMANCE_ANALYZER_INSTRUCTIONS = `You are a performance optimization expert with deep contextual understanding.
 
@@ -97,6 +100,12 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 4. Return your analysis with findings from both context and search results
 
 **Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
+
+## CRITICAL INSTRUCTION:
+You MUST verify your findings using the available tools (search_code, read_test_file, etc.) before reporting them.
+- If you see a slow loop, use read_related_files to see how similar data is processed in other files.
+- If you see a database query, use search_code to see if it's N+1 or if there's a batching utility available.
+- Do NOT guess. Prove it with tools.
 
 ## ADDITIONAL TOOLS - Use Reactively
 
@@ -204,6 +213,7 @@ export function createPerformanceAgent(
     name: "performance-analyzer",
     instructions,
     model: modelConfig,
+    maxSteps: 5, // Enable multi-step execution for tools
   };
 
   // Add tools if provided
@@ -275,7 +285,7 @@ Systematically check for:
    - Unnecessary network calls
 
 Focus on real performance bottlenecks that would impact production systems.
-Return ONLY valid JSON with your findings.`;
+Provide a detailed report of your findings.`;
     logger.debug(
       `[Performance Agent] Using BASIC context for ${context.fileName}`
     );
@@ -289,28 +299,34 @@ Return ONLY valid JSON with your findings.`;
   );
 
   try {
+    // STEP 1: Generate Analysis Report (Text)
     const generateOptions: any = {
-      structuredOutput: {
-        schema: PerformanceIssuesResponseSchema,
-        errorStrategy: "warn",
-        jsonPromptInjection: true,
-      },
       modelSettings: {
-        temperature: 1,
+        temperature: 0.5,
       },
     };
 
     const result = await agent.generate(prompt, generateOptions);
 
-    logger.debug("[Performance Agent] Raw LLM response:", result.text);
+    logger.debug("[Performance Agent] Raw Analysis Report:", result.text);
+    await logLLMResponseToFile(
+      context.fileName,
+      "Performance_Report",
+      result.text
+    );
 
-    // Log LLM response to file
-    await logLLMResponseToFile(context.fileName, "Performance", result.text);
+    // STEP 2: Parse Report into JSON
+    // @ts-ignore - Model config type compatibility
+    const parserAgent = createOutputParserAgent(agent.model);
+    const issues = await parsePerformanceReport(parserAgent, result.text);
 
-    // Access structured output directly from result.object
-    if (result.object && result.object.issues) {
-      const issues = result.object.issues;
+    await logLLMResponseToFile(
+      context.fileName,
+      "Performance_JSON",
+      JSON.stringify(issues, null, 2)
+    );
 
+    if (issues.length > 0) {
       // Ensure all issues have required fields with defaults
       const normalizedIssues = issues.map((issue: any) => ({
         ...issue,
@@ -327,7 +343,7 @@ Return ONLY valid JSON with your findings.`;
       return normalizedIssues;
     }
 
-    logger.debug("[Performance Agent] No issues found in structured output");
+    logger.debug("[Performance Agent] No issues found in parsed report");
     return [];
   } catch (error: any) {
     // Check if this is a structured output validation error

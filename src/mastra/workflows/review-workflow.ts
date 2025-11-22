@@ -11,9 +11,18 @@ import {
   type EnrichedContext,
 } from "../../core/review/context-strategies.js";
 import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
-import { runSecurityAnalysisWithContext, createSecurityAgent } from "../agents/security-agent.js";
-import { runPerformanceAnalysisWithContext, createPerformanceAgent } from "../agents/performance-agent.js";
-import { runLogicAnalysisWithContext, createLogicAgent } from "../agents/logic-agent.js";
+import {
+  runSecurityAnalysisWithContext,
+  createSecurityAgent,
+} from "../agents/security-agent.js";
+import {
+  runPerformanceAnalysisWithContext,
+  createPerformanceAgent,
+} from "../agents/performance-agent.js";
+import {
+  runLogicAnalysisWithContext,
+  createLogicAgent,
+} from "../agents/logic-agent.js";
 import {
   createSearchCodeTool,
   createReadTestFileTool,
@@ -446,7 +455,11 @@ export const runAllAgentsInParallelStep = createStep({
 
     // Helper function to run an agent on all files in parallel
     const runAgentOnFiles = async (
-      agentCreatorFn: (modelConfig: any, stacks?: any[], tools?: Record<string, any>) => any,
+      agentCreatorFn: (
+        modelConfig: any,
+        stacks?: any[],
+        tools?: Record<string, any>
+      ) => any,
       agentName: string,
       strategyType: "security" | "performance" | "logic",
       analysisFn: (
@@ -568,7 +581,9 @@ export const runAllAgentsInParallelStep = createStep({
 
           const toolCount = Object.keys(clientTools).length;
           logger.debug(
-            `[${agentName}:${file.path}] Created ${toolCount} tools for agent`
+            `[${agentName}:${file.path}] Created ${toolCount} tools for agent: ${Object.keys(
+              clientTools
+            ).join(", ")}`
           );
 
           // Create agent with tools for this file

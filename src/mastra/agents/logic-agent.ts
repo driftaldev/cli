@@ -104,6 +104,34 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 
 **Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
 
+## ADDITIONAL TOOLS - Use Reactively
+
+### read_test_file (Budget: 2-3 calls)
+**When to use:** When you need to understand expected behavior, edge cases, or validate assumptions about how code should handle errors
+**Example:** Found function without clear null handling → Read test file to see if nulls/errors are expected to be handled and if edge cases are covered
+**Query format:** { "testFilePath": "src/utils/__tests__/validator.test.ts" }
+
+### read_related_files (Budget: 2-3 calls)
+**When to use:** When checking if error handling or null checks are applied consistently across a module
+**Example:** Found missing null check → Read related files to see if similar functions have proper guards
+**Query format:** { "directory": "src/api", "pattern": "*.ts", "maxFiles": 5 }
+
+### find_all_usages (Budget: 2-3 calls)
+**When to use:** When determining if a nullable return value is handled correctly at all call sites
+**Example:** Function returns T | null but one call site missing null check → Find all usages to verify pattern
+**Query format:** { "identifier": "getUserData", "maxResults": 10 }
+
+### get_function_callers (Budget: 1-2 calls)
+**When to use:** When assessing impact of a potential breaking change or verifying all callers handle errors correctly
+**Example:** Found function that can throw but no try/catch → Find callers to see if error is handled upstream
+**Query format:** { "functionName": "parseConfig", "maxResults": 10 }
+
+**Tool Usage Strategy:**
+1. First analyze with enriched context (IMPORTS, TYPE DEFINITIONS, DEPENDENCIES)
+2. Identify 2-3 critical bugs or missing checks
+3. Use tools strategically to verify patterns, test coverage, and error handling consistency
+4. Include tool findings in your bug analysis
+
 ## Classic Bug Categories to Check:
 
 - **Null/undefined handling** - especially when imports show nullable returns
@@ -194,7 +222,7 @@ export async function runLogicAnalysisWithContext(
   context:
     | EnrichedContext
     | { changedCode: string; fileName: string; language: string },
-  searchTool?: any
+  clientTools?: any
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "relatedTests" in context;
@@ -272,13 +300,12 @@ Return ONLY valid JSON with your findings.`;
       },
     };
 
-    // Add search_code tool if available
-    if (searchTool) {
-      generateOptions.clientTools = {
-        search_code: searchTool,
-      };
+    // Add client tools if available
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      generateOptions.clientTools = clientTools;
+      const toolCount = Object.keys(clientTools).length;
       logger.debug(
-        `[Logic Agent] search_code tool enabled for ${context.fileName}`
+        `[Logic Agent] ${toolCount} tools enabled for ${context.fileName}: ${Object.keys(clientTools).join(", ")}`
       );
     }
 

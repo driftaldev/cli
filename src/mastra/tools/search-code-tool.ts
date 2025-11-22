@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createTool } from "@mastra/core/tools";
 import type { QueryRouter } from "../../core/query/query-router.js";
 import type { SearchParams } from "../../core/indexer/moss-client.js";
 import { buildContext } from "../../core/query/context-builder.js";
@@ -73,14 +74,15 @@ export function createSearchCodeTool(
   counter: SearchCounter,
   fileName: string
 ) {
-  return {
+  return createTool({
     id: "search_code",
     description:
       "Search across indexed codebases with semantic understanding. Use this tool REACTIVELY when you identify suspicious patterns that need verification. You have a limited search budget (3-5 searches per file), so use strategically.",
     inputSchema: SearchCodeInputSchema,
     outputSchema: SearchCodeOutputSchema,
 
-    execute: async (input: SearchCodeInput): Promise<SearchCodeOutput> => {
+    execute: async ({ context }: { context: SearchCodeInput }): Promise<SearchCodeOutput> => {
+      const input = context;
       try {
         logger.debug(
           `[SearchCodeTool] Agent requested search: "${input.query}" (${counter.count}/${counter.limit} searches used)`
@@ -181,5 +183,5 @@ export function createSearchCodeTool(
         return result;
       }
     },
-  };
+  });
 }

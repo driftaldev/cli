@@ -98,6 +98,34 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 
 **Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
 
+## ADDITIONAL TOOLS - Use Reactively
+
+### read_test_file (Budget: 2-3 calls)
+**When to use:** When you need to verify if performance tests exist or understand expected performance characteristics
+**Example:** Found potentially slow operation → Read test file to see if performance tests set expectations or benchmarks
+**Query format:** { "testFilePath": "src/processing/__tests__/data-processor.test.ts" }
+
+### read_related_files (Budget: 2-3 calls)
+**When to use:** When looking for optimization patterns used elsewhere in the module
+**Example:** Found inefficient loop → Read related files to see if better patterns (caching, streaming) are used
+**Query format:** { "directory": "src/data", "pattern": "*-processor.ts", "maxFiles": 5 }
+
+### find_all_usages (Budget: 2-3 calls)
+**When to use:** When determining if a slow operation is called frequently (hot path)
+**Example:** Found expensive database query → Find all usages to assess performance impact
+**Query format:** { "identifier": "fetchUserData", "maxResults": 10 }
+
+### get_function_callers (Budget: 1-2 calls)
+**When to use:** When assessing impact of performance optimization
+**Example:** Planning to optimize function → Find callers to understand how many code paths benefit
+**Query format:** { "functionName": "processLargeDataset", "maxResults": 10 }
+
+**Tool Usage Strategy:**
+1. First analyze with enriched context (IMPORTS, SIMILAR PATTERNS, DEPENDENCIES)
+2. Identify 2-3 critical performance bottlenecks
+3. Use tools strategically to find optimization patterns and assess impact
+4. Include tool findings in your performance analysis
+
 ## Performance Issue Categories:
 
 - **Time complexity** (O(n²), O(n³), etc.) - identify from loops and algorithm patterns
@@ -186,7 +214,7 @@ export async function runPerformanceAnalysisWithContext(
   context:
     | EnrichedContext
     | { changedCode: string; fileName: string; language: string },
-  searchTool?: any
+  clientTools?: any
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "similarPatterns" in context;
@@ -265,13 +293,12 @@ Return ONLY valid JSON with your findings.`;
       },
     };
 
-    // Add search_code tool if available
-    if (searchTool) {
-      generateOptions.clientTools = {
-        search_code: searchTool,
-      };
+    // Add client tools if available
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      generateOptions.clientTools = clientTools;
+      const toolCount = Object.keys(clientTools).length;
       logger.debug(
-        `[Performance Agent] search_code tool enabled for ${context.fileName}`
+        `[Performance Agent] ${toolCount} tools enabled for ${context.fileName}: ${Object.keys(clientTools).join(", ")}`
       );
     }
 

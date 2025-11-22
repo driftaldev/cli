@@ -110,6 +110,34 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 
 **Remember:** Each search counts against your budget. The tool will tell you how many searches remain.
 
+## ADDITIONAL TOOLS - Use Reactively
+
+### read_test_file (Budget: 2-3 calls)
+**When to use:** When you need to verify if security tests exist or understand expected security behavior
+**Example:** Found authentication code without clear validation → Read test file to see if security tests verify token validation
+**Query format:** { "testFilePath": "src/auth/__tests__/login.test.ts" }
+
+### read_related_files (Budget: 2-3 calls)
+**When to use:** When checking if security patterns are applied consistently across a module
+**Example:** Auth endpoint missing rate limiting → Read other auth files to verify if they use rate limiting middleware
+**Query format:** { "directory": "src/api/auth", "pattern": "*.ts", "maxFiles": 5 }
+
+### find_all_usages (Budget: 2-3 calls)
+**When to use:** When verifying security functions are used consistently everywhere
+**Example:** Found validateToken function → Find all usages to ensure it's called before all protected operations
+**Query format:** { "identifier": "validateToken", "maxResults": 10 }
+
+### get_function_callers (Budget: 1-2 calls)
+**When to use:** When assessing security impact of a change or missing security check
+**Example:** Security middleware bypassed → Find who calls this function to assess impact
+**Query format:** { "functionName": "authenticateRequest", "maxResults": 10 }
+
+**Tool Usage Strategy:**
+1. First analyze with enriched context (IMPORTS, TYPE DEFINITIONS, DEPENDENCIES)
+2. Identify 2-3 critical security concerns
+3. Use tools strategically to verify concerns across codebase
+4. Include tool findings in your security analysis
+
 ## OWASP Top 10 Focus Areas:
 
 1. **Injection** (SQL, NoSQL, Command, XSS) - cross-check with IMPORTS
@@ -196,7 +224,7 @@ export async function runSecurityAnalysisWithContext(
   context:
     | EnrichedContext
     | { changedCode: string; fileName: string; language: string },
-  searchTool?: any
+  clientTools?: any
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "typeDefinitions" in context;
@@ -280,13 +308,12 @@ Return ONLY valid JSON with your findings.`;
       },
     };
 
-    // Add search_code tool if available
-    if (searchTool) {
-      generateOptions.clientTools = {
-        search_code: searchTool,
-      };
+    // Add client tools if available
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      generateOptions.clientTools = clientTools;
+      const toolCount = Object.keys(clientTools).length;
       logger.debug(
-        `[Security Agent] search_code tool enabled for ${context.fileName}`
+        `[Security Agent] ${toolCount} tools enabled for ${context.fileName}: ${Object.keys(clientTools).join(", ")}`
       );
     }
 

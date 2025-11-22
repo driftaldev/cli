@@ -16,6 +16,10 @@ import { runPerformanceAnalysisWithContext } from "../agents/performance-agent.j
 import { runLogicAnalysisWithContext } from "../agents/logic-agent.js";
 import {
   createSearchCodeTool,
+  createReadTestFileTool,
+  createReadRelatedFilesTool,
+  createFindAllUsagesTool,
+  createGetFunctionCallersTool,
   SearchCache,
   createSearchCounter,
 } from "../tools/index.js";
@@ -418,6 +422,7 @@ export const runAllAgentsInParallelStep = createStep({
     performanceAgent: z.any(),
     logicAgent: z.any(),
     queryRouter: z.any().optional(),
+    repoPath: z.string().optional(),
     onProgress: z.function().optional(),
     analysis: z.any().optional(),
   }),
@@ -434,6 +439,7 @@ export const runAllAgentsInParallelStep = createStep({
       performanceAgent,
       logicAgent,
       queryRouter,
+      repoPath = process.cwd(), // Default to current working directory
       onProgress,
     } = inputData;
 
@@ -445,7 +451,11 @@ export const runAllAgentsInParallelStep = createStep({
       agent: any,
       agentName: string,
       strategyType: "security" | "performance" | "logic",
-      analysisFn: (agent: any, context: any, searchTool?: any) => Promise<ReviewIssue[]>
+      analysisFn: (
+        agent: any,
+        context: any,
+        searchTool?: any
+      ) => Promise<ReviewIssue[]>
     ): Promise<ReviewIssue[]> => {
       const ranker = new RelevanceRanker();
       const strategy = ContextStrategyFactory.getStrategy(strategyType);
@@ -503,28 +513,69 @@ export const runAllAgentsInParallelStep = createStep({
             fileSearchCaches.set(file.path, searchCache);
           }
 
-          // Create search tool if queryRouter is available
-          let searchTool = undefined;
+          // Create all tools with appropriate budgets
+          const clientTools: any = {};
+
+          // Tool 1: search_code (3-5 searches)
           if (queryRouter) {
-            const searchCounter = createSearchCounter(5); // 5 searches per agent per file
-            searchTool = createSearchCodeTool(
+            const searchCounter = createSearchCounter(5);
+            clientTools.search_code = createSearchCodeTool(
               queryRouter,
               searchCache,
               searchCounter,
-              file.path // Pass fileName for tool call logging
-            );
-            logger.debug(
-              `[${agentName}:${file.path}] Created search_code tool with 5-search budget`
-            );
-          } else {
-            logger.debug(
-              `[${agentName}:${file.path}] No QueryRouter available, skipping search_code tool`
+              file.path
             );
           }
 
+          // Tool 2: read_test_file (2-3 calls)
+          const testFileCounter = createSearchCounter(3);
+          clientTools.read_test_file = createReadTestFileTool(
+            repoPath,
+            searchCache,
+            testFileCounter,
+            file.path
+          );
+
+          // Tool 3: read_related_files (2-3 calls)
+          const relatedFilesCounter = createSearchCounter(3);
+          clientTools.read_related_files = createReadRelatedFilesTool(
+            repoPath,
+            file.path,
+            searchCache,
+            relatedFilesCounter,
+            file.path
+          );
+
+          // Tool 4: find_all_usages (2-3 calls)
+          if (queryRouter) {
+            const usagesCounter = createSearchCounter(3);
+            clientTools.find_all_usages = createFindAllUsagesTool(
+              queryRouter,
+              searchCache,
+              usagesCounter,
+              file.path
+            );
+          }
+
+          // Tool 5: get_function_callers (1-2 calls)
+          if (queryRouter) {
+            const callersCounter = createSearchCounter(2);
+            clientTools.get_function_callers = createGetFunctionCallersTool(
+              queryRouter,
+              searchCache,
+              callersCounter,
+              file.path
+            );
+          }
+
+          const toolCount = Object.keys(clientTools).length;
+          logger.debug(
+            `[${agentName}:${file.path}] Created ${toolCount} tools for agent`
+          );
+
           // Run the agent-specific analysis function
           try {
-            const fileIssues = await analysisFn(agent, context, searchTool);
+            const fileIssues = await analysisFn(agent, context, clientTools);
             return fileIssues;
           } catch (error) {
             logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);

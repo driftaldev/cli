@@ -195,7 +195,8 @@ IMPORTANT: Use originalCode + fixedCode when MODIFYING buggy code. Use code when
  */
 export function createLogicAgent(
   modelConfig: AgentModelConfig,
-  stacks?: Stack[]
+  stacks?: Stack[],
+  tools?: Record<string, any>
 ) {
   // Build instructions with stack-specific additions
   let instructions = LOGIC_ANALYZER_INSTRUCTIONS;
@@ -207,11 +208,18 @@ export function createLogicAgent(
     }
   }
 
-  return new Agent({
+  const agentConfig: any = {
     name: "logic-analyzer",
     instructions,
     model: modelConfig,
-  });
+  };
+
+  // Add tools if provided
+  if (tools && Object.keys(tools).length > 0) {
+    agentConfig.tools = tools;
+  }
+
+  return new Agent(agentConfig);
 }
 
 /**
@@ -221,8 +229,7 @@ export async function runLogicAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string },
-  clientTools?: any
+    | { changedCode: string; fileName: string; language: string }
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "relatedTests" in context;
@@ -299,15 +306,6 @@ Return ONLY valid JSON with your findings.`;
         temperature: 1,
       },
     };
-
-    // Add client tools if available
-    if (clientTools && Object.keys(clientTools).length > 0) {
-      generateOptions.clientTools = clientTools;
-      const toolCount = Object.keys(clientTools).length;
-      logger.debug(
-        `[Logic Agent] ${toolCount} tools enabled for ${context.fileName}: ${Object.keys(clientTools).join(", ")}`
-      );
-    }
 
     const result = await agent.generate(prompt, generateOptions);
 

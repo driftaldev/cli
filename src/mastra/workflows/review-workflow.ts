@@ -11,9 +11,9 @@ import {
   type EnrichedContext,
 } from "../../core/review/context-strategies.js";
 import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
-import { runSecurityAnalysisWithContext } from "../agents/security-agent.js";
-import { runPerformanceAnalysisWithContext } from "../agents/performance-agent.js";
-import { runLogicAnalysisWithContext } from "../agents/logic-agent.js";
+import { runSecurityAnalysisWithContext, createSecurityAgent } from "../agents/security-agent.js";
+import { runPerformanceAnalysisWithContext, createPerformanceAgent } from "../agents/performance-agent.js";
+import { runLogicAnalysisWithContext, createLogicAgent } from "../agents/logic-agent.js";
 import {
   createSearchCodeTool,
   createReadTestFileTool,
@@ -418,9 +418,8 @@ export const runAllAgentsInParallelStep = createStep({
   inputSchema: z.object({
     reviewableFiles: z.array(z.any()),
     enrichedContexts: z.record(z.any()).optional(),
-    securityAgent: z.any(),
-    performanceAgent: z.any(),
-    logicAgent: z.any(),
+    modelConfig: z.any(),
+    stacks: z.array(z.any()).optional(),
     queryRouter: z.any().optional(),
     repoPath: z.string().optional(),
     onProgress: z.function().optional(),
@@ -435,9 +434,8 @@ export const runAllAgentsInParallelStep = createStep({
     const {
       reviewableFiles,
       enrichedContexts,
-      securityAgent,
-      performanceAgent,
-      logicAgent,
+      modelConfig,
+      stacks,
       queryRouter,
       repoPath = process.cwd(), // Default to current working directory
       onProgress,
@@ -448,7 +446,7 @@ export const runAllAgentsInParallelStep = createStep({
 
     // Helper function to run an agent on all files in parallel
     const runAgentOnFiles = async (
-      agent: any,
+      agentCreatorFn: (modelConfig: any, stacks?: any[], tools?: Record<string, any>) => any,
       agentName: string,
       strategyType: "security" | "performance" | "logic",
       analysisFn: (
@@ -573,9 +571,15 @@ export const runAllAgentsInParallelStep = createStep({
             `[${agentName}:${file.path}] Created ${toolCount} tools for agent`
           );
 
+          // Create agent with tools for this file
+          const agent = agentCreatorFn(modelConfig, stacks, clientTools);
+          logger.debug(
+            `[${agentName}:${file.path}] Created agent with ${toolCount} tools`
+          );
+
           // Run the agent-specific analysis function
           try {
-            const fileIssues = await analysisFn(agent, context, clientTools);
+            const fileIssues = await analysisFn(agent, context);
             return fileIssues;
           } catch (error) {
             logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);
@@ -599,19 +603,19 @@ export const runAllAgentsInParallelStep = createStep({
 
     const [securityIssues, performanceIssues, logicIssues] = await Promise.all([
       runAgentOnFiles(
-        securityAgent,
+        createSecurityAgent,
         "Security",
         "security",
         runSecurityAnalysisWithContext
       ),
       runAgentOnFiles(
-        performanceAgent,
+        createPerformanceAgent,
         "Performance",
         "performance",
         runPerformanceAnalysisWithContext
       ),
       runAgentOnFiles(
-        logicAgent,
+        createLogicAgent,
         "Logic",
         "logic",
         runLogicAnalysisWithContext
@@ -777,9 +781,8 @@ export function createReviewWorkflow() {
     triggerSchema: z.object({
       diff: z.any(),
       changeAnalyzer: z.any(),
-      securityAgent: z.any(),
-      performanceAgent: z.any(),
-      logicAgent: z.any(),
+      modelConfig: z.any(),
+      stacks: z.array(z.any()).optional(),
       issueRanker: z.any(),
       contextEnricher: z.any().optional(),
       queryRouter: z.any().optional(), // QueryRouter for search_code tool

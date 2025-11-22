@@ -197,7 +197,8 @@ IMPORTANT: Use originalCode + fixedCode when MODIFYING vulnerable code. Use code
  */
 export function createSecurityAgent(
   modelConfig: AgentModelConfig,
-  stacks?: Stack[]
+  stacks?: Stack[],
+  tools?: Record<string, any>
 ) {
   // Build instructions with stack-specific additions
   let instructions = SECURITY_ANALYZER_INSTRUCTIONS;
@@ -209,11 +210,18 @@ export function createSecurityAgent(
     }
   }
 
-  return new Agent({
+  const agentConfig: any = {
     name: "security-analyzer",
     instructions,
     model: modelConfig,
-  });
+  };
+
+  // Add tools if provided
+  if (tools && Object.keys(tools).length > 0) {
+    agentConfig.tools = tools;
+  }
+
+  return new Agent(agentConfig);
 }
 
 /**
@@ -223,8 +231,7 @@ export async function runSecurityAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string },
-  clientTools?: any
+    | { changedCode: string; fileName: string; language: string }
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "typeDefinitions" in context;
@@ -307,15 +314,6 @@ Return ONLY valid JSON with your findings.`;
         temperature: 1,
       },
     };
-
-    // Add client tools if available
-    if (clientTools && Object.keys(clientTools).length > 0) {
-      generateOptions.clientTools = clientTools;
-      const toolCount = Object.keys(clientTools).length;
-      logger.debug(
-        `[Security Agent] ${toolCount} tools enabled for ${context.fileName}: ${Object.keys(clientTools).join(", ")}`
-      );
-    }
 
     const result = await agent.generate(prompt, generateOptions);
 

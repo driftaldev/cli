@@ -98,9 +98,8 @@ export class CodeReviewer {
       inputData: {
         diff,
         changeAnalyzer: this.changeAnalyzer,
-        securityAgent: this.mastraOrchestrator.securityAgent,
-        performanceAgent: this.mastraOrchestrator.performanceAgent,
-        logicAgent: this.mastraOrchestrator.logicAgent,
+        modelConfig: this.mastraOrchestrator.getModelConfig(),
+        stacks: this.mastraOrchestrator.getStacks(),
         issueRanker: this.issueRanker,
         contextEnricher: this.contextEnricher,
         queryRouter: this.mastraOrchestrator.getQueryRouter(), // For search_code tool

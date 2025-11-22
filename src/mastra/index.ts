@@ -230,6 +230,20 @@ export class MastraReviewOrchestrator {
   }
 
   /**
+   * Get model config for agents
+   */
+  getModelConfig() {
+    return this.modelConfig;
+  }
+
+  /**
+   * Get stacks for agents
+   */
+  getStacks() {
+    return this.config.stacks;
+  }
+
+  /**
    * Get all available tools
    */
   getTools() {

@@ -223,7 +223,8 @@ export function createSecurityAgent(
     name: "security-analyzer",
     instructions,
     model: modelConfig,
-    maxSteps: 5, // Enable multi-step execution for tools
+    maxSteps: 5,
+    stream: false,
   };
 
   // Add tools if provided

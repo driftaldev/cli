@@ -184,6 +184,7 @@ export function createLogicAgent(
     instructions,
     model: modelConfig,
     maxSteps: 5,
+    stream: false,
   };
 
   // Add tools if provided

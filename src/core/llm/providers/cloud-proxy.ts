@@ -99,11 +99,8 @@ export class CloudProxyProvider extends LLMProvider {
     // Ensure tokens are loaded
     await this.ensureAuthenticated();
 
-    logger.debug(this.tokens?.selectedModels?.primary, "this is the selected model from auth.json");
-
     // Get model from auth.json, fallback to default
-    const model =
-      this.tokens?.selectedModels?.primary || "o3";
+    const model = this.tokens?.selectedModels?.primary || "o3";
 
     return model;
   }
@@ -263,6 +260,7 @@ export class CloudProxyProvider extends LLMProvider {
       temperature: request.temperature,
       max_tokens: request.maxTokens,
       stop_sequences: request.stopSequences,
+      stream: false,
     };
 
     const response = await this.makeRequest(
@@ -330,7 +328,7 @@ export class CloudProxyProvider extends LLMProvider {
       temperature: request.temperature,
       max_tokens: request.maxTokens,
       stop_sequences: request.stopSequences,
-      stream: true,
+      stream: false,
     };
 
     const response = await this.makeRequest(

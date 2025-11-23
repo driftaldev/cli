@@ -90,6 +90,11 @@ async function handleModelsSelect() {
     const currentPrimary = status.tokens?.selectedModels?.primary;
     const currentFallback = status.tokens?.selectedModels?.fallback;
 
+    if (models.length === 0) {
+      console.log(chalk.yellow("No models available."));
+      return;
+    }
+
     const choices = models.map((model) => ({
       title: `${model.name} - ${model.description}`,
       value: model.id,
@@ -98,9 +103,10 @@ async function handleModelsSelect() {
     console.log(chalk.cyan("\nUpdate Model Selection\n"));
 
     // Select primary model
-    const initialPrimary = currentPrimary
+    const foundPrimaryIndex = currentPrimary
       ? choices.findIndex((c) => c.value === currentPrimary)
-      : 0;
+      : -1;
+    const initialPrimary = foundPrimaryIndex >= 0 ? foundPrimaryIndex : 0;
 
     const primaryResponse = await prompts({
       type: "select",
@@ -129,9 +135,10 @@ async function handleModelsSelect() {
       const fallbackChoices = choices.filter(
         (c) => c.value !== primaryResponse.primary
       );
-      const initialFallback = currentFallback
+      const foundFallbackIndex = currentFallback
         ? fallbackChoices.findIndex((c) => c.value === currentFallback)
-        : 0;
+        : -1;
+      const initialFallback = foundFallbackIndex >= 0 ? foundFallbackIndex : 0;
 
       const fallbackResponse = await prompts({
         type: "select",

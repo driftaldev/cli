@@ -99,6 +99,8 @@ export class CloudProxyProvider extends LLMProvider {
     // Ensure tokens are loaded
     await this.ensureAuthenticated();
 
+    logger.debug(this.tokens?.selectedModels?.primary, "this is the selected model from auth.json");
+
     // Get model from auth.json, fallback to default
     const model =
       this.tokens?.selectedModels?.primary || "o3";

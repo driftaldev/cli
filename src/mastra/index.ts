@@ -11,6 +11,7 @@ import type { Stack } from "../core/indexer/stack-detector.js";
 import { QueryRouter } from "../core/query/query-router.js";
 import { MossClient } from "../core/indexer/moss-client.js";
 import packageJson from "../../package.json" assert { type: "json" };
+import { logger } from "../utils/logger.js";
 
 const DEFAULT_PROXY_URL =
   process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev";
@@ -158,8 +159,9 @@ export class MastraReviewOrchestrator {
         const { providerId, modelId } =
           this.parseModelIdentifier(selectedModel);
 
+        logger.debug(modelId, baseUrl, "this is the model being used");
         return {
-          id: `${providerId}/${modelId}`,
+          id: modelId, // Use the full model ID (already includes provider prefix)
           url: baseUrl,
           apiKey: tokens.accessToken,
           headers: {
@@ -198,20 +200,29 @@ export class MastraReviewOrchestrator {
     modelId: string;
   } {
     if (!modelId.includes("/")) {
+      // Handle models without provider prefix
+      let providerId = "openai"; // default
+
       if (modelId.startsWith("claude")) {
-        return { providerId: "anthropic", modelId };
+        providerId = "anthropic";
+      } else if (modelId.startsWith("gpt-") || modelId.startsWith("o1-") || modelId.startsWith("o3-") || modelId.startsWith("o4-")) {
+        providerId = "openai";
+      } else if (modelId.startsWith("gemini")) {
+        providerId = "gemini";
       }
-      if (modelId.startsWith("gpt-")) {
-        return { providerId: "openai", modelId };
-      }
-      return { providerId: "openai", modelId };
+
+      // Return model ID WITH provider prefix
+      return {
+        providerId,
+        modelId: `${providerId}/${modelId}`
+      };
     }
 
     const [providerId, ...rest] = modelId.split("/");
-    const normalizedModelId = rest.join("/");
+    logger.debug(providerId, rest, "this is the providerId and rest being parsed", modelId);
     return {
       providerId: providerId || "openai",
-      modelId: normalizedModelId || modelId,
+      modelId: modelId, // Keep the full model ID with provider prefix
     };
   }
 

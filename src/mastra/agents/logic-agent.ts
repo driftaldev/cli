@@ -183,7 +183,7 @@ export function createLogicAgent(
     name: "logic-analyzer",
     instructions,
     model: modelConfig,
-    maxSteps: 5, // Enable multi-step execution for tools
+    maxSteps: 5,
   };
 
   // Add tools if provided
@@ -332,9 +332,6 @@ Provide a detailed report of your findings.`;
   }
 }
 
-/**
- * Run logic analysis using the agent (backward compatibility)
- */
 export async function runLogicAnalysis(
   agent: Agent,
   context: {

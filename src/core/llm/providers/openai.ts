@@ -36,7 +36,9 @@ export class OpenAIProvider extends LLMProvider {
     this.maxTokens = openaiConfig.maxTokens || 4096;
   }
 
-  async generate(options: LLMGenerateOptions): Promise<LLMGenerateResponse> {
+  override async generate(
+    options: LLMGenerateOptions
+  ): Promise<LLMGenerateResponse> {
     return this.retryWithBackoff(async () => {
       const response = await this.client.chat.completions.create({
         model: this.modelName,
@@ -66,7 +68,7 @@ export class OpenAIProvider extends LLMProvider {
     });
   }
 
-  async *generateStream(
+  override async *generateStream(
     options: LLMGenerateOptions
   ): AsyncGenerator<LLMStreamChunk> {
     const stream = await this.client.chat.completions.create({
@@ -101,7 +103,7 @@ export class OpenAIProvider extends LLMProvider {
   }
 
   // Not needed for cloud proxy providers, hosted providers will count tokens for you
-  countTokens(text: string): number {
+  override countTokens(text: string): number {
     // Approximate token count for GPT models (~4 chars per token)
     return Math.ceil(text.length / 4);
   }

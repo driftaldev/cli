@@ -202,7 +202,8 @@ export async function runLogicAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string }
+    | { changedCode: string; fileName: string; language: string },
+  clientTools?: Record<string, any>
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "relatedTests" in context;
@@ -282,6 +283,12 @@ Provide a detailed report of your findings.`;
         temperature: 0.5, // Lower temperature to encourage tool use over creative writing
       },
     };
+
+    // Add clientTools if provided
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      generateOptions.clientTools = clientTools;
+      logger.debug(`[Logic Agent] Passing ${Object.keys(clientTools).length} tools to generate: ${Object.keys(clientTools).join(", ")}`);
+    }
 
     const result = await agent.generate(prompt, generateOptions);
 

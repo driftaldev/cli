@@ -242,7 +242,8 @@ export async function runSecurityAnalysisWithContext(
   agent: Agent,
   context:
     | EnrichedContext
-    | { changedCode: string; fileName: string; language: string }
+    | { changedCode: string; fileName: string; language: string },
+  clientTools?: Record<string, any>
 ): Promise<any[]> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "typeDefinitions" in context;
@@ -321,6 +322,12 @@ Provide a detailed report of your findings.`;
         temperature: 0.5,
       },
     };
+
+    // Add clientTools if provided
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      generateOptions.clientTools = clientTools;
+      logger.debug(`[Security Agent] Passing ${Object.keys(clientTools).length} tools to generate: ${Object.keys(clientTools).join(", ")}`);
+    }
 
     const result = await agent.generate(prompt, generateOptions);
 

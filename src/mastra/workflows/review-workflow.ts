@@ -594,7 +594,7 @@ export const runAllAgentsInParallelStep = createStep({
 
           // Run the agent-specific analysis function
           try {
-            const fileIssues = await analysisFn(agent, context);
+            const fileIssues = await analysisFn(agent, context, clientTools);
             return fileIssues;
           } catch (error) {
             logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);

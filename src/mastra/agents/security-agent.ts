@@ -6,10 +6,7 @@ import { SecurityContextStrategy } from "../../core/review/context-strategies.js
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
-import {
-  createOutputParserAgent,
-  parseSecurityReport,
-} from "./output-parser-agent.js";
+import { SecurityIssuesResponseSchema } from "../schemas/issue-schema.js";
 
 const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
@@ -316,10 +313,15 @@ Provide a detailed report of your findings.`;
   );
 
   try {
-    // STEP 1: Generate Analysis Report (Text)
+    // Generate structured JSON output directly
     const generateOptions: any = {
       modelSettings: {
         temperature: 0.5,
+      },
+      structuredOutput: {
+        schema: SecurityIssuesResponseSchema,
+        errorStrategy: "warn",
+        jsonPromptInjection: true,
       },
     };
 
@@ -338,10 +340,8 @@ Provide a detailed report of your findings.`;
       result.text
     );
 
-    // STEP 2: Parse Report into JSON
-    // @ts-ignore - Model config type compatibility
-    const parserAgent = createOutputParserAgent(agent.model);
-    const issues = await parseSecurityReport(parserAgent, result.text);
+    // Extract issues from structured output
+    const issues = result.object?.issues || [];
 
     await logLLMResponseToFile(
       context.fileName,
@@ -366,7 +366,7 @@ Provide a detailed report of your findings.`;
       return normalizedIssues;
     }
 
-    logger.debug("[Security Agent] No issues found in parsed report");
+    logger.debug("[Security Agent] No issues found in structured output");
     return [];
   } catch (error: any) {
     // Check if this is a structured output validation error

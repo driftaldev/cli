@@ -6,10 +6,7 @@ import { LogicContextStrategy } from "../../core/review/context-strategies.js";
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
-import {
-  createOutputParserAgent,
-  parseLogicReport,
-} from "./output-parser-agent.js";
+import { LogicIssuesResponseSchema } from "../schemas/issue-schema.js";
 
 const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
 
@@ -152,14 +149,46 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 
 ## Output Format:
 
-Provide a detailed report of your findings. For each issue, explain:
-1. What the bug is
-2. Where it is located (file and line)
-3. Why it is a bug (rationale)
-4. How to fix it (suggestion)
-5. Severity and confidence
+**IMPORTANT**: The code you receive includes line numbers in the format "lineNum: code". Extract the line number from this format for the location field.
 
-Be as specific as possible.`;
+For each logic bug found, provide:
+- Type: bug
+- Severity: critical | high | medium | low
+- Title: Brief description of the bug
+- Description: Detailed explanation including context from imports/types if relevant
+- Location: file, line number (extract from "lineNum: code" format), column (optional), endLine (optional)
+- ProblematicPath: The code path that causes the issue (optional)
+- EdgeCases: Array of edge cases this bug affects (optional)
+- Suggestion: Object with description and EITHER:
+  - For MODIFICATIONS: "originalCode" (the buggy code) and "fixedCode" (the corrected code) - this generates a git-style diff
+  - For ADDITIONS: "code" (new code to add) - when adding validation or error handling
+- Rationale: Why this is a bug, referencing context if applicable
+- Confidence: 0.0 to 1.0
+
+Output ONLY valid JSON in this format:
+{
+  "issues": [
+    {
+      "type": "bug",
+      "severity": "critical" | "high" | "medium" | "low",
+      "title": "Brief description",
+      "description": "Detailed explanation",
+      "location": { "file": "path/to/file.ts", "line": 42 },
+      "problematicPath": "The code path causing the issue",
+      "edgeCases": ["edge case 1", "edge case 2"],
+      "suggestion": {
+        "description": "How to fix the bug",
+        "originalCode": "(For modifications) The buggy code with 3-5 lines of context",
+        "fixedCode": "(For modifications) The corrected code with 3-5 lines of context",
+        "code": "(For additions) New code to add - use when adding validation/error handling"
+      },
+      "rationale": "Why this is a bug",
+      "confidence": 0.0-1.0
+    }
+  ]
+}
+
+IMPORTANT: Use originalCode + fixedCode when MODIFYING buggy code. Use code when ADDING new validation or error handling.`;
 
 /**
  * Create logic analyzer agent
@@ -276,11 +305,15 @@ Provide a detailed report of your findings.`;
   );
 
   try {
-    // STEP 1: Generate Analysis Report (Text)
-    // We remove structuredOutput to allow the agent to "think" and use tools freely
+    // Generate structured JSON output directly
     const generateOptions: any = {
       modelSettings: {
-        temperature: 0.5, // Lower temperature to encourage tool use over creative writing
+        temperature: 0.5,
+      },
+      structuredOutput: {
+        schema: LogicIssuesResponseSchema,
+        errorStrategy: "warn",
+        jsonPromptInjection: true,
       },
     };
 
@@ -295,11 +328,8 @@ Provide a detailed report of your findings.`;
     logger.debug("[Logic Agent] Raw Analysis Report:", result.text);
     await logLLMResponseToFile(context.fileName, "Logic_Report", result.text);
 
-    // STEP 2: Parse Report into JSON
-    // We use a specialized agent that strictly formats the output
-    // @ts-ignore - Model config type compatibility
-    const parserAgent = createOutputParserAgent(agent.model);
-    const issues = await parseLogicReport(parserAgent, result.text);
+    // Extract issues from structured output
+    const issues = result.object?.issues || [];
 
     await logLLMResponseToFile(
       context.fileName,
@@ -321,7 +351,7 @@ Provide a detailed report of your findings.`;
       return normalizedIssues;
     }
 
-    logger.debug("[Logic Agent] No issues found in parsed report");
+    logger.debug("[Logic Agent] No issues found in structured output");
     return [];
   } catch (error: any) {
     // Check if this is a structured output validation error

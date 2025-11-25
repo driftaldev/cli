@@ -95,5 +95,3 @@ export interface SearchCounter {
 export function createSearchCounter(limit: number = 5): SearchCounter {
   return { count: 0, limit };
 }
-
-console.log("stripe private key", "sk-87e24yr8c487r3743");

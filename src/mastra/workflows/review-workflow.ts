@@ -12,19 +12,9 @@ import {
 } from "../../core/review/context-strategies.js";
 import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
 import {
-  runSecurityAnalysisWithContext,
-  runSecurityAnalysisStreaming,
-  createSecurityAgent,
-} from "../agents/security-agent.js";
-import {
-  runPerformanceAnalysisWithContext,
-  runPerformanceAnalysisStreaming,
-  createPerformanceAgent,
-} from "../agents/performance-agent.js";
-import {
   runLogicAnalysisWithContext,
   runLogicAnalysisStreaming,
-  createLogicAgent,
+  createCodeAgent,
 } from "../agents/logic-agent.js";
 import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 import {
@@ -440,9 +430,7 @@ export const runAllAgentsInParallelStep = createStep({
     analysis: z.any().optional(),
   }),
   outputSchema: z.object({
-    securityIssues: z.array(z.any()),
-    performanceIssues: z.array(z.any()),
-    logicIssues: z.array(z.any()),
+    codeIssues: z.array(z.any()),
   }),
   execute: async ({ inputData }) => {
     const {
@@ -467,7 +455,7 @@ export const runAllAgentsInParallelStep = createStep({
         tools?: Record<string, any>
       ) => any,
       agentName: string,
-      strategyType: "security" | "performance" | "logic",
+      strategyType: "code",
       analysisFn: (
         agent: any,
         context: any,
@@ -651,45 +639,27 @@ export const runAllAgentsInParallelStep = createStep({
       return issues;
     };
 
-    // Run all three agents in parallel
-    logger.info("[Workflow] Starting parallel execution of all agents");
+    // Run code analyzer agent
+    logger.info("[Workflow] Starting code analysis");
     const startTime = Date.now();
 
-    const [logicIssues] = await Promise.all([
-      // runAgentOnFiles(
-      //   createSecurityAgent,
-      //   "Security",
-      //   "security",
-      //   runSecurityAnalysisWithContext,
-      //   runSecurityAnalysisStreaming
-      // ),
-      // runAgentOnFiles(
-      //   createPerformanceAgent,
-      //   "Performance",
-      //   "performance",
-      //   runPerformanceAnalysisWithContext,
-      //   runPerformanceAnalysisStreaming
-      // ),
-      runAgentOnFiles(
-        createLogicAgent,
-        "Logic",
-        "logic",
-        runLogicAnalysisWithContext,
-        runLogicAnalysisStreaming
-      ),
-    ]);
+    const codeIssues = await runAgentOnFiles(
+      createCodeAgent,
+      "Code",
+      "code",
+      runLogicAnalysisWithContext,
+      runLogicAnalysisStreaming
+    );
 
     const duration = Date.now() - startTime;
     logger.info(
-      `[Workflow] Parallel agent execution complete in ${duration}ms: ` +
-        `Logic: ${logicIssues.length} issues`
+      `[Workflow] Code analysis complete in ${duration}ms: ` +
+        `${codeIssues.length} issues`
     );
 
     return {
       ...inputData,
-      // securityIssues,
-      // performanceIssues,
-      logicIssues,
+      codeIssues,
     };
   },
 });
@@ -700,25 +670,19 @@ export const runAllAgentsInParallelStep = createStep({
 export const synthesizeResultsStep = createStep({
   id: "synthesize-results",
   inputSchema: z.object({
-    securityIssues: z.array(z.any()).optional(),
-    performanceIssues: z.array(z.any()).optional(),
-    logicIssues: z.array(z.any()).optional(),
+    codeIssues: z.array(z.any()).optional(),
   }),
   outputSchema: z.object({
     allIssues: z.array(z.any()),
   }),
   execute: async ({ inputData }) => {
-    const securityIssues = inputData.securityIssues ?? [];
-    const performanceIssues = inputData.performanceIssues ?? [];
-    const logicIssues = inputData.logicIssues ?? [];
+    const codeIssues = inputData.codeIssues ?? [];
 
     logger.debug("[Workflow] Synthesize step received:");
-    logger.debug("  Security issues:", securityIssues.length);
-    logger.debug("  Performance issues:", performanceIssues.length);
-    logger.debug("  Logic issues:", logicIssues.length);
+    logger.debug("  Code issues:", codeIssues.length);
 
-    // Combine all issues
-    const allIssues = [...securityIssues, ...performanceIssues, ...logicIssues];
+    // Use code issues directly
+    const allIssues = [...codeIssues];
 
     logger.debug("[Workflow] Total combined issues:", allIssues.length);
 

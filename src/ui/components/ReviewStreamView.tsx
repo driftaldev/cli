@@ -106,7 +106,7 @@ export const ReviewStreamView: React.FC<ReviewStreamViewProps> = ({
           <Box flexDirection="column" marginBottom={1}>
             <Box>
               <Text color="white" bold>
-                📄 {truncatePath(currentFile, 60)}
+                 {truncatePath(currentFile, 60)}
               </Text>
             </Box>
           </Box>

@@ -2,14 +2,14 @@ import { Agent } from "@mastra/core";
 import type { AgentModelConfig } from "../types.js";
 import { logger } from "../../utils/logger.js";
 import type { EnrichedContext } from "../../core/review/context-strategies.js";
-import { LogicContextStrategy } from "../../core/review/context-strategies.js";
+import { CodeContextStrategy } from "../../core/review/context-strategies.js";
 import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
 import { LogicIssuesResponseSchema } from "../schemas/issue-schema.js";
 import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 
-const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
+const CODE_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs, security vulnerabilities, and edge cases with deep contextual understanding.
 
 ## CRITICAL: Context-Aware Analysis
 
@@ -19,7 +19,7 @@ When analyzing code, you will receive enriched context including:
 - **SIMILAR PATTERNS**: How similar code patterns are used elsewhere
 - **DEPENDENCIES**: Upstream and downstream dependencies
 
-**YOU MUST cross-reference the changed code against this context to find bugs.**
+**YOU MUST cross-reference the changed code against this context to find bugs and security issues.**
 
 ### Systematic Analysis Workflow:
 
@@ -29,6 +29,7 @@ When analyzing code, you will receive enriched context including:
    - If it returns T | null or T | undefined, verify null/undefined checks exist at usage sites
    - If parameters have specific types, verify all call sites match these types (count, order, type)
    - Example bug to catch: \`const keypair = getKeypair()\` when definition shows \`Promise<Keypair | null>\`
+   - **Security**: Check for insecure imports (weak crypto, dangerous eval, unvalidated inputs)
 
 2. **Type Consistency:**
    - Compare variable assignments against TYPE DEFINITIONS section
@@ -67,6 +68,14 @@ When analyzing code, you will receive enriched context including:
    - Incorrect conditional logic
    - Infinite loops
    - Missing return statements
+
+8. **Security Vulnerabilities:**
+   - **Input Validation**: SQL injection, XSS, command injection, path traversal
+   - **Authentication/Authorization**: Missing auth checks, broken access control, privilege escalation
+   - **Sensitive Data**: Hardcoded secrets, credentials in logs, unencrypted sensitive data
+   - **Cryptography**: Weak algorithms (MD5, SHA1), insecure random number generation, improper key management
+   - **API Security**: Missing rate limiting, CORS misconfigurations, exposed debug endpoints
+   - **OWASP Top 10**: Injection flaws, broken authentication, sensitive data exposure, XXE, broken access control, security misconfiguration, XSS, insecure deserialization, components with known vulnerabilities, insufficient logging
 
 ## SEARCH_CODE TOOL - Use Reactively & Strategically
 
@@ -147,6 +156,10 @@ You have access to the **search_code** tool with a **3-5 search budget per file*
 - **Infinite loops**
 - **Dead code**
 - **API misuse** - using imported functions incorrectly based on their definitions
+- **Security vulnerabilities** - injection attacks, authentication bypass, sensitive data exposure
+- **Cryptographic weaknesses** - weak algorithms, hardcoded keys, insecure random generation
+- **Input validation failures** - XSS, SQL injection, command injection, path traversal
+- **Authorization issues** - missing access controls, privilege escalation
 
 ## Output Format:
 
@@ -192,25 +205,34 @@ Output ONLY valid JSON in this format:
 IMPORTANT: Use originalCode + fixedCode when MODIFYING buggy code. Use code when ADDING new validation or error handling.`;
 
 /**
- * Create logic analyzer agent
+ * Create code analyzer agent (combines logic and security analysis)
  */
-export function createLogicAgent(
+export function createCodeAgent(
   modelConfig: AgentModelConfig,
   stacks?: Stack[],
   tools?: Record<string, any>
 ) {
   // Build instructions with stack-specific additions
-  let instructions = LOGIC_ANALYZER_INSTRUCTIONS;
+  let instructions = CODE_ANALYZER_INSTRUCTIONS;
 
   if (stacks && stacks.length > 0) {
-    const stackSpecific = getStackSpecificInstructions("logic", stacks);
-    if (stackSpecific) {
-      instructions = instructions + stackSpecific;
+    // Try both "logic" and "security" stack-specific instructions
+    const logicStackSpecific = getStackSpecificInstructions("logic", stacks);
+    const securityStackSpecific = getStackSpecificInstructions(
+      "security",
+      stacks
+    );
+
+    if (logicStackSpecific) {
+      instructions = instructions + logicStackSpecific;
+    }
+    if (securityStackSpecific) {
+      instructions = instructions + securityStackSpecific;
     }
   }
 
   const agentConfig: any = {
-    name: "logic-analyzer",
+    name: "code-analyzer",
     instructions,
     model: modelConfig,
     maxSteps: 5,
@@ -224,6 +246,9 @@ export function createLogicAgent(
 
   return new Agent(agentConfig);
 }
+
+// Keep the old name for backwards compatibility
+export const createLogicAgent = createCodeAgent;
 
 /**
  * Run logic analysis using the agent with enriched context
@@ -241,12 +266,10 @@ export async function runLogicAnalysisWithContext(
   let prompt: string;
 
   if (isEnriched) {
-    // Use the logic strategy to format the enriched context
-    const strategy = new LogicContextStrategy();
+    // Use the code strategy to format the enriched context
+    const strategy = new CodeContextStrategy();
     prompt = strategy.formatPrompt(context as EnrichedContext);
-    logger.debug(
-      `[Logic Agent] Using ENRICHED context for ${context.fileName}`
-    );
+    logger.debug(`[Code Agent] Using ENRICHED context for ${context.fileName}`);
   } else {
     // Fallback to basic prompt
     prompt = `Analyze the following code for logic bugs and edge cases:
@@ -404,11 +427,9 @@ export async function runLogicAnalysisStreaming(
   let prompt: string;
 
   if (isEnriched) {
-    const strategy = new LogicContextStrategy();
+    const strategy = new CodeContextStrategy();
     prompt = strategy.formatPrompt(context as EnrichedContext);
-    logger.debug(
-      `[Logic Agent] Using ENRICHED context for ${context.fileName}`
-    );
+    logger.debug(`[Code Agent] Using ENRICHED context for ${context.fileName}`);
   } else {
     prompt = `Analyze the following code for logic bugs and edge cases:
 

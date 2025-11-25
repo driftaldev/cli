@@ -754,6 +754,303 @@ ${context.changedCode}
 }
 
 /**
+ * Code Analyzer Context Strategy
+ * Combines logic and security analysis priorities
+ * Focus: comprehensive analysis of logic bugs and security vulnerabilities
+ */
+export class CodeContextStrategy implements ContextStrategy {
+  name = "code";
+
+  selectContext(
+    context: EnrichedContext,
+    ranker: RelevanceRanker
+  ): EnrichedContext {
+    // Select imports relevant to both logic and security
+    const rankedImports = context.imports
+      ? ranker.rankImports(
+          context.imports.map((imp) => ({
+            importPath: imp.importPath,
+            content: imp.definition,
+            usageCount: this.countUsages(
+              context.changedCode,
+              imp.importedNames
+            ),
+          })),
+          context.changedCode,
+          {
+            maxItems: 7,
+            // Combined priority keywords for both security and logic
+            priorityKeywords: [
+              "auth",
+              "crypto",
+              "security",
+              "hash",
+              "token",
+              "validate",
+              "sanitize",
+            ],
+          }
+        )
+      : [];
+
+    if (context.imports && context.imports.length > 0) {
+      logger.debug(
+        `[CodeStrategy] Import filtering: ${context.imports.length} → ${rankedImports.length}`
+      );
+      rankedImports.forEach((item, idx) => {
+        logger.debug(
+          `  ${idx + 1}. ${item.metadata?.importPath} (score: ${item.score.toFixed(2)}, ${item.reason})`
+        );
+      });
+    }
+
+    // Type definitions are critical for both logic and security analysis
+    const rankedTypes = context.typeDefinitions
+      ? ranker.rankTypeDefinitions(
+          context.typeDefinitions,
+          context.changedCode,
+          { maxItems: 7 }
+        )
+      : [];
+
+    if (context.typeDefinitions && context.typeDefinitions.length > 0) {
+      logger.debug(
+        `[CodeStrategy] Type filtering: ${context.typeDefinitions.length} → ${rankedTypes.length}`
+      );
+      rankedTypes.forEach((item, idx) => {
+        logger.debug(
+          `  ${idx + 1}. ${item.metadata?.name} (score: ${item.score.toFixed(2)}, ${item.reason})`
+        );
+      });
+    }
+
+    // Tests are crucial for understanding expected behavior
+    const rankedTests = context.relatedTests
+      ? ranker.rankTests(
+          context.relatedTests.map((test) => ({
+            filePath: test.filePath,
+            tests: test.testNames,
+          })),
+          context.fileName,
+          { maxItems: 3 }
+        )
+      : [];
+
+    if (context.relatedTests && context.relatedTests.length > 0) {
+      logger.debug(
+        `[CodeStrategy] Test filtering: ${context.relatedTests.length} → ${rankedTests.length}`
+      );
+      rankedTests.forEach((item, idx) => {
+        logger.debug(
+          `  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`
+        );
+      });
+    }
+
+    // Similar patterns for consistency checking
+    const rankedPatterns = context.similarPatterns
+      ? ranker.rankSimilarPatterns(
+          context.similarPatterns,
+          context.changedCode,
+          { maxItems: 5, priorityKeywords: [context.fileName] }
+        )
+      : [];
+
+    if (context.similarPatterns && context.similarPatterns.length > 0) {
+      logger.debug(
+        `[CodeStrategy] Pattern filtering: ${context.similarPatterns.length} → ${rankedPatterns.length}`
+      );
+      rankedPatterns.forEach((item, idx) => {
+        logger.debug(
+          `  ${idx + 1}. ${item.metadata?.filePath} (score: ${item.score.toFixed(2)}, ${item.reason})`
+        );
+      });
+    }
+
+    logger.debug(
+      `[CodeStrategy] Dependencies: keeping all dependencies (no filtering)`
+    );
+
+    return {
+      fileName: context.fileName,
+      changedCode: context.changedCode,
+      language: context.language,
+      fullContent: context.fullContent,
+      imports: this.mapRankedToImports(rankedImports, context.imports || []),
+      typeDefinitions: this.mapRankedToTypes(
+        rankedTypes,
+        context.typeDefinitions || []
+      ),
+      similarPatterns: this.mapRankedToPatterns(
+        rankedPatterns,
+        context.similarPatterns || []
+      ),
+      relatedTests: this.mapRankedToTests(
+        rankedTests,
+        context.relatedTests || []
+      ),
+      dependencies: context.dependencies,
+    };
+  }
+
+  formatPrompt(context: EnrichedContext): string {
+    let prompt = `Analyze the following code for logic bugs, security vulnerabilities, and edge cases:
+
+## File: ${context.fileName}
+Language: ${context.language}
+
+## Changed Code:
+\`\`\`${context.language}
+${context.changedCode}
+\`\`\`
+`;
+
+    // Add type definitions (critical for both logic and security)
+    if (context.typeDefinitions && context.typeDefinitions.length > 0) {
+      prompt += "\n## Type Definitions:\n";
+      context.typeDefinitions.forEach((type) => {
+        prompt += `\n### ${type.name} (from ${type.source})\n`;
+        prompt += `\`\`\`${context.language}\n${type.definition}\n\`\`\`\n`;
+      });
+    }
+
+    // Add related tests
+    if (context.relatedTests && context.relatedTests.length > 0) {
+      prompt += "\n## Related Tests:\n";
+      context.relatedTests.forEach((test) => {
+        prompt += `\n### ${test.filePath}\n`;
+        if (test.testNames.length > 0) {
+          prompt += "Test cases:\n";
+          test.testNames.slice(0, 10).forEach((name) => {
+            prompt += `- ${name}\n`;
+          });
+          if (test.testNames.length > 10) {
+            prompt += `... and ${test.testNames.length - 10} more\n`;
+          }
+        }
+      });
+    }
+
+    // Add imports (full content, no truncation)
+    if (context.imports && context.imports.length > 0) {
+      prompt += "\n## Imported Dependencies:\n";
+      context.imports.forEach((imp) => {
+        prompt += `\n### ${imp.importPath}\n`;
+        prompt += `Imports: ${imp.importedNames.join(", ")}\n`;
+        if (imp.definition) {
+          prompt += `\`\`\`${context.language}\n${imp.definition}\n\`\`\`\n`;
+        }
+      });
+    }
+
+    // Add upstream dependencies with full content for depth 1
+    if (
+      context.dependencies?.upstream &&
+      context.dependencies.upstream.length > 0
+    ) {
+      prompt += "\n## Upstream Dependencies (Full Files):\n";
+      context.dependencies.upstream.forEach((dep) => {
+        if (dep.depth === 1 && dep.content) {
+          prompt += `\n### ${dep.filePath} (depth ${dep.depth})\n`;
+          prompt += `\`\`\`${context.language}\n${dep.content}\n\`\`\`\n`;
+        } else if (dep.relevantDefinitions) {
+          prompt += `\n### ${dep.filePath} (depth ${dep.depth}) - Key Signatures\n`;
+          prompt += `\`\`\`${context.language}\n${dep.relevantDefinitions}\n\`\`\`\n`;
+        } else {
+          prompt += `- ${dep.filePath}\n`;
+          if (dep.exports.length > 0) {
+            prompt += `  Exports: ${dep.exports.slice(0, 5).join(", ")}\n`;
+          }
+        }
+      });
+    }
+
+    // Add downstream dependencies
+    if (
+      context.dependencies?.downstream &&
+      context.dependencies.downstream.length > 0
+    ) {
+      prompt += "\n## Used By:\n";
+      context.dependencies.downstream.slice(0, 3).forEach((dep) => {
+        prompt += `- ${dep.filePath}\n`;
+      });
+    }
+
+    // Add similar patterns
+    if (context.similarPatterns && context.similarPatterns.length > 0) {
+      prompt += "\n## Similar Code Patterns:\n";
+      context.similarPatterns.forEach((pattern, idx) => {
+        prompt += `\n### Pattern ${idx + 1} from ${pattern.filePath}\n`;
+        prompt += `\`\`\`${context.language}\n${this.truncate(pattern.code, 300)}\n\`\`\`\n`;
+      });
+    }
+
+    prompt += "\nAnalyze for:\n";
+    prompt += "- Logic errors and edge cases\n";
+    prompt += "- Type safety and null handling\n";
+    prompt += "- Error handling completeness\n";
+    prompt += "- Security vulnerabilities (injection, XSS, auth bypass, sensitive data exposure)\n";
+    prompt += "- Cryptographic weaknesses and input validation issues\n";
+    prompt += "- Consistency with existing patterns\n";
+    prompt += "- Test coverage gaps\n";
+    prompt += "- Potential runtime errors\n";
+
+    return prompt;
+  }
+
+  private countUsages(code: string, names: string[]): number {
+    return names.reduce((count, name) => {
+      const regex = new RegExp(`\\b${name}\\b`, "g");
+      return count + (code.match(regex) || []).length;
+    }, 0);
+  }
+
+  private truncate(text: string, maxLength: number): string {
+    return text.length > maxLength
+      ? text.slice(0, maxLength) + "\n// ... truncated ..."
+      : text;
+  }
+
+  private mapRankedToImports(ranked: RankedItem[], original: any[]): any[] {
+    return ranked
+      .map((r) => {
+        const orig = original.find(
+          (o) => o.importPath === r.metadata?.importPath
+        );
+        return orig ? { ...orig, relevance: r.score } : null;
+      })
+      .filter(Boolean);
+  }
+
+  private mapRankedToTypes(ranked: RankedItem[], original: any[]): any[] {
+    return ranked
+      .map((r) => {
+        const orig = original.find((o) => o.name === r.metadata?.name);
+        return orig ? { ...orig, relevance: r.score } : null;
+      })
+      .filter(Boolean);
+  }
+
+  private mapRankedToPatterns(ranked: RankedItem[], original: any[]): any[] {
+    return ranked
+      .map((r) => {
+        const orig = original.find((o) => o.filePath === r.metadata?.filePath);
+        return orig ? { ...orig, relevance: r.score } : null;
+      })
+      .filter(Boolean);
+  }
+
+  private mapRankedToTests(ranked: RankedItem[], original: any[]): any[] {
+    return ranked
+      .map((r) => {
+        const orig = original.find((o) => o.filePath === r.metadata?.filePath);
+        return orig ? { ...orig, relevance: r.score } : null;
+      })
+      .filter(Boolean);
+  }
+}
+
+/**
  * Strategy factory
  */
 export class ContextStrategyFactory {
@@ -761,6 +1058,7 @@ export class ContextStrategyFactory {
     ["security", new SecurityContextStrategy()],
     ["performance", new PerformanceContextStrategy()],
     ["logic", new LogicContextStrategy()],
+    ["code", new CodeContextStrategy()],
   ]);
 
   static getStrategy(agentType: string): ContextStrategy {

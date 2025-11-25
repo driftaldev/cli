@@ -1,7 +1,5 @@
 import type { LLMConfig } from "../config/schema.js";
-import { createSecurityAgent } from "./agents/security-agent.js";
-import { createPerformanceAgent } from "./agents/performance-agent.js";
-import { createLogicAgent } from "./agents/logic-agent.js";
+import { createCodeAgent, createLogicAgent } from "./agents/logic-agent.js";
 import { createReviewWorkflow } from "./workflows/review-workflow.js";
 import { ReviewMemory } from "./memory/review-memory.js";
 import type { AgentModelConfig } from "./types.js";
@@ -29,10 +27,9 @@ export class MastraReviewOrchestrator {
   private modelConfig?: AgentModelConfig;
   private _queryRouter?: QueryRouter;
 
-  // Agents
-  public securityAgent: any;
-  public performanceAgent: any;
-  public logicAgent: any;
+  // Agent (combines logic and security analysis)
+  public codeAgent: any;
+  public logicAgent: any; // Backwards compatibility alias
 
   // Workflow
   public reviewWorkflow: any;
@@ -63,10 +60,9 @@ export class MastraReviewOrchestrator {
     // Get stacks from config
     const stacks = this.config.stacks;
 
-    // Create agents with stack-specific prompts
-    this.securityAgent = createSecurityAgent(this.modelConfig, stacks);
-    this.performanceAgent = createPerformanceAgent(this.modelConfig, stacks);
-    this.logicAgent = createLogicAgent(this.modelConfig, stacks);
+    // Create code agent (combines logic and security analysis)
+    this.codeAgent = createCodeAgent(this.modelConfig, stacks);
+    this.logicAgent = this.codeAgent; // Backwards compatibility
 
     // Create workflow
     this.reviewWorkflow = createReviewWorkflow();

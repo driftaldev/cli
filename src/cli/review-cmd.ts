@@ -4,7 +4,7 @@ import chalk from "chalk";
 import fs from "fs/promises";
 import path from "path";
 import inquirer from "inquirer";
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   getUnstagedChanges,
   getStagedChanges,
@@ -22,6 +22,7 @@ import { ensureIndexedAndWatching } from "./index-cmd.js";
 import { MossClient } from "../core/indexer/moss-client.js";
 import { MorphApplier } from "../core/review/morph-applier.js";
 import { AppLayout } from "../ui/components/AppLayout.js";
+import { ReviewStreamView } from "../ui/components/ReviewStreamView.js";
 import {
   getCurrentModel,
   getVersion,
@@ -34,6 +35,8 @@ import type {
   ReviewResults,
   ReviewIssue as ReviewIssueType,
 } from "../core/review/issue.js";
+import type { StreamEvent, StreamingState } from "../ui/types/stream-events.js";
+import { initialStreamingState } from "../ui/types/stream-events.js";
 
 let inkModule: any | null = null;
 
@@ -45,6 +48,62 @@ async function getInk() {
   }
   return inkModule;
 }
+
+/**
+ * Props for the streaming review wrapper component
+ */
+interface StreamingReviewWrapperProps {
+  ink: any;
+  version: string;
+  model: string;
+  directory: string;
+  streamingState: StreamingState;
+  results: ReviewResults | null;
+  durationSeconds: string | null;
+}
+
+/**
+ * Wrapper component that shows streaming view during review,
+ * then transitions to summary view when complete
+ */
+const StreamingReviewWrapper: React.FC<StreamingReviewWrapperProps> = ({
+  ink,
+  version,
+  model,
+  directory,
+  streamingState,
+  results,
+  durationSeconds,
+}) => {
+  const { Box } = ink;
+
+  // Show streaming view while in progress
+  if (!streamingState.isComplete || !results) {
+    return React.createElement(AppLayout, {
+      ink,
+      version,
+      model,
+      directory,
+      children: React.createElement(ReviewStreamView, {
+        ink,
+        state: streamingState,
+      }),
+    });
+  }
+
+  // Show final summary once complete
+  return React.createElement(AppLayout, {
+    ink,
+    version,
+    model,
+    directory,
+    children: React.createElement(ReviewSummary, {
+      results,
+      ink,
+      durationSeconds: durationSeconds || undefined,
+    }),
+  });
+};
 
 /**
  * Log review results to backend for analytics
@@ -541,31 +600,191 @@ export function createReviewCommand(): Command {
         spinner.text = "Initializing AI reviewer...";
         const reviewer = new CodeReviewer(llmConfig, reviewConfig);
 
-        // 5. Run review
-        spinner.text = "Running analysis...";
-        const results = await reviewer.review(
-          diff,
-          null,
-          {
-            severity: options.severity as any,
-            analyzers: options.analyzers,
-            quick: options.quick,
-            verbose: options.verbose,
-          },
-          (current, total, fileName) => {
-            const shortPath =
-              fileName.length > 40 ? "..." + fileName.slice(-37) : fileName;
-            spinner.text = `Analyzing file ${current}/${total}: ${shortPath}`;
-          }
-        );
+        const shouldUseInk = process.stdout.isTTY;
+        const formatter = new TextFormatter();
 
-        const reviewEndTime = Date.now();
-        const reviewDuration = reviewEndTime - reviewStartTime;
-        const durationSeconds = (reviewDuration / 1000).toFixed(2);
+        // 5. Run review with streaming UI if TTY
+        let results: ReviewResults;
+        let durationSeconds: string;
 
-        spinner.succeed(
-          `Review complete - found ${results.issues.length} issue(s) in ${durationSeconds}s`
-        );
+        if (shouldUseInk) {
+          // Stop the spinner before rendering Ink UI
+          spinner.stop();
+
+          const ink = await getInk();
+          const currentModel = (await getCurrentModel()) || "Unknown";
+          const version = getVersion() || "0.0.0";
+          const directory = getCurrentDirectory() || process.cwd();
+
+          // Create mutable state for streaming
+          let streamingState: StreamingState = {
+            ...initialStreamingState,
+            totalFiles: diff.files.length,
+          };
+          let reviewResults: ReviewResults | null = null;
+          let reviewDurationSeconds: string | null = null;
+
+          // Create a function to update the Ink render
+          let updateRender: (() => void) | null = null;
+
+          // Render initial streaming UI
+          const app = ink.render(
+            React.createElement(StreamingReviewWrapper, {
+              ink,
+              version,
+              model: currentModel,
+              directory,
+              streamingState,
+              results: reviewResults,
+              durationSeconds: reviewDurationSeconds,
+            })
+          );
+
+          // Stream event handler
+          const handleStreamEvent = (event: StreamEvent) => {
+            switch (event.type) {
+              case "thinking":
+                streamingState = {
+                  ...streamingState,
+                  thinkingContent: event.content,
+                  isThinking: true,
+                };
+                break;
+              case "text":
+                streamingState = {
+                  ...streamingState,
+                  reviewContent: event.content,
+                  isThinking: false,
+                };
+                break;
+              case "agent-start":
+                streamingState = {
+                  ...streamingState,
+                  currentAgent: event.agent,
+                  currentFile: event.fileName,
+                  thinkingContent: "",
+                  reviewContent: "",
+                  isThinking: false,
+                };
+                break;
+              case "agent-complete":
+                streamingState = {
+                  ...streamingState,
+                  isThinking: false,
+                };
+                break;
+              case "file-start":
+                streamingState = {
+                  ...streamingState,
+                  currentFile: event.fileName,
+                  currentAgent: event.agent as any,
+                };
+                break;
+              case "file-complete":
+                streamingState = {
+                  ...streamingState,
+                  filesProcessed: streamingState.filesProcessed + 1,
+                };
+                break;
+              case "complete":
+                streamingState = {
+                  ...streamingState,
+                  isComplete: true,
+                };
+                break;
+            }
+
+            // Re-render with updated state
+            ink.render(
+              React.createElement(StreamingReviewWrapper, {
+                ink,
+                version,
+                model: currentModel,
+                directory,
+                streamingState,
+                results: reviewResults,
+                durationSeconds: reviewDurationSeconds,
+              })
+            );
+          };
+
+          // Run the review with streaming
+          results = await reviewer.review(
+            diff,
+            null,
+            {
+              severity: options.severity as any,
+              analyzers: options.analyzers,
+              quick: options.quick,
+              verbose: options.verbose,
+            },
+            (current, total, fileName) => {
+              // Progress callback - update file progress
+              streamingState = {
+                ...streamingState,
+                filesProcessed: current,
+                totalFiles: total,
+                currentFile: fileName,
+              };
+            },
+            handleStreamEvent
+          );
+
+          const reviewEndTime = Date.now();
+          const reviewDuration = reviewEndTime - reviewStartTime;
+          durationSeconds = (reviewDuration / 1000).toFixed(2);
+          reviewDurationSeconds = durationSeconds;
+          reviewResults = results;
+
+          // Mark as complete and show final results
+          streamingState = {
+            ...streamingState,
+            isComplete: true,
+          };
+
+          // Final render with results
+          ink.render(
+            React.createElement(StreamingReviewWrapper, {
+              ink,
+              version,
+              model: currentModel,
+              directory,
+              streamingState,
+              results: reviewResults,
+              durationSeconds: reviewDurationSeconds,
+            })
+          );
+
+          await app.waitUntilExit();
+        } else {
+          // Non-TTY mode - use spinner
+          spinner.text = "Running analysis...";
+          results = await reviewer.review(
+            diff,
+            null,
+            {
+              severity: options.severity as any,
+              analyzers: options.analyzers,
+              quick: options.quick,
+              verbose: options.verbose,
+            },
+            (current, total, fileName) => {
+              const shortPath =
+                fileName.length > 40 ? "..." + fileName.slice(-37) : fileName;
+              spinner.text = `Analyzing file ${current}/${total}: ${shortPath}`;
+            }
+          );
+
+          const reviewEndTime = Date.now();
+          const reviewDuration = reviewEndTime - reviewStartTime;
+          durationSeconds = (reviewDuration / 1000).toFixed(2);
+
+          spinner.succeed(
+            `Review complete - found ${results.issues.length} issue(s) in ${durationSeconds}s`
+          );
+
+          formatter.format(results);
+        }
 
         // Log review to backend (async, non-blocking)
         const tokens = await loadAuthTokens();
@@ -575,7 +794,7 @@ export function createReviewCommand(): Command {
           });
         }
 
-        // 6. Show similar issues if requested
+        // Show similar issues if requested
         if (options.similar) {
           const memory = reviewer.getMemory();
           if (memory && results.issues.length > 0) {
@@ -605,33 +824,8 @@ export function createReviewCommand(): Command {
           }
         }
 
-        // 7. Display results
-        const formatter = new TextFormatter();
-        const shouldUseInk = process.stdout.isTTY;
-
-        if (shouldUseInk) {
-          const ink = await getInk();
-          const currentModel = await getCurrentModel();
-          const version = getVersion();
-          const directory = getCurrentDirectory();
-
-          const app = ink.render(
-            React.createElement(AppLayout, {
-              ink,
-              version,
-              model: currentModel,
-              directory,
-              children: React.createElement(ReviewSummary, {
-                results,
-                ink,
-                durationSeconds,
-              }),
-            })
-          );
-          await app.waitUntilExit();
-        }
-
-        if (!shouldUseInk || options.verbose) {
+        // Show verbose output if requested (even in TTY mode)
+        if (options.verbose && shouldUseInk) {
           formatter.format(results);
         }
 

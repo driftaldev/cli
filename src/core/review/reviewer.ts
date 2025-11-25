@@ -11,6 +11,7 @@ import { ContextEnricher } from "./context-enricher.js";
 import { loadSavedRepoName } from "../../utils/repo-name-store.js";
 import { detectStacks } from "../indexer/stack-detector.js";
 import { logger } from "../../utils/logger.js";
+import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 
 export interface ReviewOptions {
   severity?: "critical" | "high" | "medium" | "low" | "info";
@@ -67,7 +68,8 @@ export class CodeReviewer {
     diff: GitDiff,
     context: ReviewContext | null,
     options: ReviewOptions = {},
-    onProgress?: (current: number, total: number, fileName: string) => void
+    onProgress?: (current: number, total: number, fileName: string) => void,
+    onStreamEvent?: StreamEventCallback
   ): Promise<ReviewResults> {
     const startTime = Date.now();
 
@@ -106,6 +108,7 @@ export class CodeReviewer {
         repoPath,
         repoName,
         onProgress,
+        onStreamEvent, // Pass streaming callback to workflow
         options: {
           minConfidence: 0.5,
           severityFilter: options.severity,

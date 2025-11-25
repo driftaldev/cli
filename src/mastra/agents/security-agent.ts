@@ -7,6 +7,7 @@ import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
 import { SecurityIssuesResponseSchema } from "../schemas/issue-schema.js";
+import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 
 const SECURITY_ANALYZER_INSTRUCTIONS = `You are a security expert with deep contextual understanding and OWASP Top 10 expertise.
 
@@ -221,7 +222,7 @@ export function createSecurityAgent(
     instructions,
     model: modelConfig,
     maxSteps: 5,
-    stream: false,
+    stream: true,
   };
 
   // Add tools if provided
@@ -328,7 +329,9 @@ Provide a detailed report of your findings.`;
     // Add clientTools if provided
     if (clientTools && Object.keys(clientTools).length > 0) {
       generateOptions.clientTools = clientTools;
-      logger.debug(`[Security Agent] Passing ${Object.keys(clientTools).length} tools to generate: ${Object.keys(clientTools).join(", ")}`);
+      logger.debug(
+        `[Security Agent] Passing ${Object.keys(clientTools).length} tools to generate: ${Object.keys(clientTools).join(", ")}`
+      );
     }
 
     const result = await agent.generate(prompt, generateOptions);
@@ -397,4 +400,231 @@ export async function runSecurityAnalysis(
   }
 ): Promise<any[]> {
   return runSecurityAnalysisWithContext(agent, context);
+}
+
+/**
+ * Run security analysis with streaming support
+ * Emits stream events for thinking/reasoning and text content
+ */
+export async function runSecurityAnalysisStreaming(
+  agent: Agent,
+  context:
+    | EnrichedContext
+    | { changedCode: string; fileName: string; language: string },
+  onStreamEvent: StreamEventCallback,
+  clientTools?: Record<string, any>
+): Promise<any[]> {
+  // Check if this is enriched context
+  const isEnriched = "imports" in context || "typeDefinitions" in context;
+
+  let prompt: string;
+
+  if (isEnriched) {
+    const strategy = new SecurityContextStrategy();
+    prompt = strategy.formatPrompt(context as EnrichedContext);
+    logger.debug(
+      `[Security Agent] Using ENRICHED context for ${context.fileName}`
+    );
+  } else {
+    prompt = `Analyze the following code for security vulnerabilities:
+
+File: ${context.fileName}
+Language: ${context.language}
+
+Code:
+\`\`\`${context.language}
+${context.changedCode}
+\`\`\`
+
+Focus on real, exploitable vulnerabilities. Avoid false positives.
+Provide a detailed report of your findings.`;
+    logger.debug(
+      `[Security Agent] Using BASIC context for ${context.fileName}`
+    );
+  }
+
+  try {
+    const streamOptions: any = {
+      modelSettings: {
+        temperature: 0.5,
+        // Enable reasoning for models that support it
+        // This works for o1/o3 style models
+        reasoningEffort: "high",
+      },
+      structuredOutput: {
+        schema: SecurityIssuesResponseSchema,
+        errorStrategy: "warn",
+        jsonPromptInjection: true,
+      },
+    };
+
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      streamOptions.clientTools = clientTools;
+    }
+
+    // Use streaming
+    const streamResult = await agent.stream(prompt, streamOptions);
+
+    let fullText = "";
+    let fullReasoning = "";
+
+    // Get the readable stream and consume it
+    const reader = streamResult.fullStream.getReader();
+
+    try {
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+
+        // Cast chunk for easier access
+        const c = chunk as any;
+        const chunkType = c.type;
+
+        // Log full chunk structure for debugging (first few chunks only)
+        if (process.env.DRIFTAL_DEBUG === "1") {
+          logger.debug(
+            `[Security Agent] Full chunk:`,
+            JSON.stringify(c, null, 2)
+          );
+        }
+
+        // Handle reasoning/thinking chunks
+        if (
+          chunkType === "reasoning-delta" ||
+          chunkType === "reasoning" ||
+          chunkType === "thinking-delta" ||
+          chunkType === "reasoning_delta"
+        ) {
+          // Try different locations for reasoning content
+          const delta =
+            c.payload?.text ||
+            c.value ||
+            c.textDelta ||
+            c.delta ||
+            c.reasoning ||
+            c.content ||
+            "";
+          if (delta) {
+            fullReasoning += delta;
+            onStreamEvent({
+              type: "thinking",
+              content: fullReasoning,
+              delta,
+            });
+          }
+        }
+        // Handle text output chunks
+        else if (chunkType === "text-delta") {
+          const textDelta =
+            c.payload?.text ||
+            c.value ||
+            c.textDelta ||
+            c.delta ||
+            c.text ||
+            "";
+          const reasoningDelta = c.payload?.reasoning || c.reasoning || "";
+
+          if (reasoningDelta) {
+            fullReasoning += reasoningDelta;
+            onStreamEvent({
+              type: "thinking",
+              content: fullReasoning,
+              delta: reasoningDelta,
+            });
+          }
+
+          if (textDelta) {
+            fullText += textDelta;
+          }
+        }
+        // Handle step-finish which may contain reasoning summary
+        else if (chunkType === "step-finish" || chunkType === "finish") {
+          const stepReasoning =
+            c.payload?.reasoning || c.reasoning || c.reasoningText || "";
+          if (stepReasoning && !fullReasoning.includes(stepReasoning)) {
+            fullReasoning += stepReasoning;
+            onStreamEvent({
+              type: "thinking",
+              content: fullReasoning,
+              delta: stepReasoning,
+            });
+          }
+          logger.debug(`[Security Agent] Step finished`, {
+            hasReasoning: !!stepReasoning,
+          });
+        }
+        // Handle 'object' type chunks - these may contain the actual model response
+        else if (chunkType === "object") {
+          if (process.env.DRIFTAL_DEBUG === "1") {
+            logger.debug(`[Security Agent] Object chunk received`);
+          }
+        }
+        // Log other unhandled chunk types for debugging
+        else if (process.env.DRIFTAL_DEBUG === "1") {
+          logger.debug(`[Security Agent] Unhandled chunk type: ${chunkType}`, {
+            keys: Object.keys(c),
+          });
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Get the final output
+    const finalOutput = await streamResult.getFullOutput();
+    const issues = (finalOutput as any)?.object?.issues || [];
+
+    // Try to get reasoning text from the stream result if not captured during streaming
+    if (!fullReasoning) {
+      try {
+        const reasoningText = await streamResult.reasoningText;
+        if (reasoningText) {
+          fullReasoning = reasoningText;
+          // Emit the reasoning as a single event since we didn't stream it
+          onStreamEvent({
+            type: "thinking",
+            content: fullReasoning,
+            delta: fullReasoning,
+          });
+          logger.debug(
+            `[Security Agent] Got reasoning from streamResult.reasoningText: ${reasoningText.substring(0, 100)}...`
+          );
+        }
+      } catch (e) {
+        // Reasoning not available, that's ok
+        logger.debug(
+          `[Security Agent] No reasoning available from streamResult`
+        );
+      }
+    }
+
+    await logLLMResponseToFile(context.fileName, "Security_Report", fullText);
+    await logLLMResponseToFile(
+      context.fileName,
+      "Security_JSON",
+      JSON.stringify(issues, null, 2)
+    );
+
+    if (issues.length > 0) {
+      const normalizedIssues = issues.map((issue: any) => ({
+        ...issue,
+        confidence: issue.confidence ?? 0.8,
+        type: issue.type || "security",
+        severity: issue.severity || "medium",
+        tags: issue.tags || [],
+      }));
+      return normalizedIssues;
+    }
+
+    return [];
+  } catch (error: any) {
+    if (error?.message?.includes("Structured output validation failed")) {
+      logger.warn(
+        `[Security Agent] Structured output validation failed for ${context.fileName}.`
+      );
+    } else {
+      logger.error("Security analysis streaming failed:", error);
+    }
+    return [];
+  }
 }

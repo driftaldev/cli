@@ -10,6 +10,8 @@ export interface LLMGenerateOptions {
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  /** Reasoning effort level for models that support extended thinking (o1/o3 style models) */
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 export interface LLMGenerateResponse {
@@ -24,8 +26,10 @@ export interface LLMGenerateResponse {
 }
 
 export interface LLMStreamChunk {
+  type?: "content_delta" | "reasoning_delta" | "message_stop";
   delta: string;
-  done: boolean;
+  done?: boolean;
+  stopReason?: string;
 }
 
 export abstract class LLMProvider {

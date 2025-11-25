@@ -38,7 +38,7 @@ export class CloudProxyProvider extends LLMProvider {
     this.maxTokens = 8192;
   }
 
-  async countTokens(text: string): Promise<number> {
+  countTokens(text: string): number {
     // Simple approximation: ~4 characters per token
     return Math.ceil(text.length / 4);
   }
@@ -259,7 +259,6 @@ export class CloudProxyProvider extends LLMProvider {
       model, // Include model from auth.json
       temperature: request.temperature,
       max_tokens: request.maxTokens,
-      stop_sequences: request.stopSequences,
       stream: false,
     };
 
@@ -279,18 +278,18 @@ export class CloudProxyProvider extends LLMProvider {
 
       return {
         content,
-        stopReason:
+        model,
+        finishReason:
           choice.finish_reason === "stop"
-            ? "end_turn"
+            ? "stop"
             : choice.finish_reason === "length"
-              ? "max_tokens"
-              : "end_turn",
-        usage: data.usage
-          ? {
-              inputTokens: data.usage.prompt_tokens || 0,
-              outputTokens: data.usage.completion_tokens || 0,
-            }
-          : undefined,
+              ? "length"
+              : "stop",
+        usage: {
+          promptTokens: data.usage?.prompt_tokens || 0,
+          completionTokens: data.usage?.completion_tokens || 0,
+          totalTokens: data.usage?.total_tokens || 0,
+        },
       };
     }
 
@@ -302,13 +301,14 @@ export class CloudProxyProvider extends LLMProvider {
 
       return {
         content: textContent,
-        stopReason: data.stop_reason || "end_turn",
-        usage: data.usage
-          ? {
-              inputTokens: data.usage.input_tokens || 0,
-              outputTokens: data.usage.output_tokens || 0,
-            }
-          : undefined,
+        model,
+        finishReason: data.stop_reason === "end_turn" ? "stop" : "stop",
+        usage: {
+          promptTokens: data.usage?.input_tokens || 0,
+          completionTokens: data.usage?.output_tokens || 0,
+          totalTokens:
+            (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        },
       };
     }
 
@@ -329,17 +329,23 @@ export class CloudProxyProvider extends LLMProvider {
       model, // Include model from auth.json
       temperature: request.temperature,
       max_tokens: request.maxTokens,
-      stop_sequences: request.stopSequences,
-      stream: false,
+      stream: true, // Enable streaming!
+      // Pass through reasoning effort if provided in the request
+      ...(request.reasoningEffort && {
+        reasoning_effort: request.reasoningEffort,
+      }),
     };
+
+    logger.debug("Streaming request body:", {
+      model,
+      hasReasoningEffort: !!request.reasoningEffort,
+    });
 
     const response = await this.makeRequest(
       "/v1/chat/completions",
       requestBody,
       true
     );
-
-    console.log("this is the response in cloud proxy", response);
 
     if (!response.body) {
       throw new Error("No response body for streaming");
@@ -379,6 +385,16 @@ export class CloudProxyProvider extends LLMProvider {
               // Handle OpenAI-style streaming
               if (data.choices && data.choices.length > 0) {
                 const delta = data.choices[0].delta;
+
+                // Handle reasoning/thinking content from reasoning models
+                if (delta?.reasoning) {
+                  yield {
+                    type: "reasoning_delta",
+                    delta: delta.reasoning,
+                  };
+                }
+
+                // Handle regular content
                 if (delta?.content) {
                   yield {
                     type: "content_delta",
@@ -404,6 +420,8 @@ export class CloudProxyProvider extends LLMProvider {
               ) {
                 yield {
                   type: "message_stop",
+                  delta: "", // Required by LLMStreamChunk interface
+                  done: true,
                   stopReason:
                     data.stop_reason ||
                     data.choices?.[0]?.finish_reason ||

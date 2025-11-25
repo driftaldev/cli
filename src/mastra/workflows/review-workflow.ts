@@ -13,16 +13,20 @@ import {
 import { RelevanceRanker } from "../../core/review/relevance-ranker.js";
 import {
   runSecurityAnalysisWithContext,
+  runSecurityAnalysisStreaming,
   createSecurityAgent,
 } from "../agents/security-agent.js";
 import {
   runPerformanceAnalysisWithContext,
+  runPerformanceAnalysisStreaming,
   createPerformanceAgent,
 } from "../agents/performance-agent.js";
 import {
   runLogicAnalysisWithContext,
+  runLogicAnalysisStreaming,
   createLogicAgent,
 } from "../agents/logic-agent.js";
+import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 import {
   createSearchCodeTool,
   createReadTestFileTool,
@@ -432,6 +436,7 @@ export const runAllAgentsInParallelStep = createStep({
     queryRouter: z.any().optional(),
     repoPath: z.string().optional(),
     onProgress: z.function().optional(),
+    onStreamEvent: z.function().optional(),
     analysis: z.any().optional(),
   }),
   outputSchema: z.object({
@@ -448,6 +453,7 @@ export const runAllAgentsInParallelStep = createStep({
       queryRouter,
       repoPath = process.cwd(), // Default to current working directory
       onProgress,
+      onStreamEvent,
     } = inputData;
 
     // Create per-file search caches (shared across all agents for the same file)
@@ -466,6 +472,12 @@ export const runAllAgentsInParallelStep = createStep({
         agent: any,
         context: any,
         searchTool?: any
+      ) => Promise<ReviewIssue[]>,
+      streamingAnalysisFn?: (
+        agent: any,
+        context: any,
+        onStreamEvent: StreamEventCallback,
+        clientTools?: any
       ) => Promise<ReviewIssue[]>
     ): Promise<ReviewIssue[]> => {
       const ranker = new RelevanceRanker();
@@ -594,8 +606,35 @@ export const runAllAgentsInParallelStep = createStep({
 
           // Run the agent-specific analysis function
           try {
-            const fileIssues = await analysisFn(agent, context, clientTools);
-            return fileIssues;
+            // Use streaming if callback is provided and streaming function exists
+            if (onStreamEvent && streamingAnalysisFn) {
+              // Emit agent start event
+              onStreamEvent({
+                type: "agent-start",
+                agent: strategyType,
+                fileName: file.path,
+              });
+
+              const fileIssues = await streamingAnalysisFn(
+                agent,
+                context,
+                onStreamEvent,
+                clientTools
+              );
+
+              // Emit agent complete event
+              onStreamEvent({
+                type: "agent-complete",
+                agent: strategyType,
+                fileName: file.path,
+              });
+
+              return fileIssues;
+            } else {
+              // Use non-streaming analysis
+              const fileIssues = await analysisFn(agent, context, clientTools);
+              return fileIssues;
+            }
           } catch (error) {
             logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);
             return [];
@@ -621,19 +660,22 @@ export const runAllAgentsInParallelStep = createStep({
       //   createSecurityAgent,
       //   "Security",
       //   "security",
-      //   runSecurityAnalysisWithContext
+      //   runSecurityAnalysisWithContext,
+      //   runSecurityAnalysisStreaming
       // ),
       // runAgentOnFiles(
       //   createPerformanceAgent,
       //   "Performance",
       //   "performance",
-      //   runPerformanceAnalysisWithContext
+      //   runPerformanceAnalysisWithContext,
+      //   runPerformanceAnalysisStreaming
       // ),
       runAgentOnFiles(
         createLogicAgent,
         "Logic",
         "logic",
-        runLogicAnalysisWithContext
+        runLogicAnalysisWithContext,
+        runLogicAnalysisStreaming
       ),
     ]);
 
@@ -802,6 +844,7 @@ export function createReviewWorkflow() {
       repoPath: z.string().optional(),
       repoName: z.string().optional(),
       onProgress: z.function().optional(),
+      onStreamEvent: z.function().optional(), // Streaming callback for UI
       options: z
         .object({
           minConfidence: z.number().default(0.5),

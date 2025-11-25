@@ -7,6 +7,7 @@ import type { Stack } from "@/core/indexer/stack-detector.js";
 import { getStackSpecificInstructions } from "./stack-prompts.js";
 import { logLLMResponseToFile } from "../workflows/review-workflow.js";
 import { LogicIssuesResponseSchema } from "../schemas/issue-schema.js";
+import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 
 const LOGIC_ANALYZER_INSTRUCTIONS = `You are an expert at finding logic bugs and edge cases with deep contextual understanding.
 
@@ -213,7 +214,7 @@ export function createLogicAgent(
     instructions,
     model: modelConfig,
     maxSteps: 5,
-    stream: false,
+    stream: true,
   };
 
   // Add tools if provided
@@ -383,4 +384,242 @@ export async function runLogicAnalysis(
   }
 ): Promise<any[]> {
   return runLogicAnalysisWithContext(agent, context);
+}
+
+/**
+ * Run logic analysis with streaming support
+ * Emits stream events for thinking/reasoning and text content
+ */
+export async function runLogicAnalysisStreaming(
+  agent: Agent,
+  context:
+    | EnrichedContext
+    | { changedCode: string; fileName: string; language: string },
+  onStreamEvent: StreamEventCallback,
+  clientTools?: Record<string, any>
+): Promise<any[]> {
+  // Check if this is enriched context
+  const isEnriched = "imports" in context || "relatedTests" in context;
+
+  let prompt: string;
+
+  if (isEnriched) {
+    const strategy = new LogicContextStrategy();
+    prompt = strategy.formatPrompt(context as EnrichedContext);
+    logger.debug(
+      `[Logic Agent] Using ENRICHED context for ${context.fileName}`
+    );
+  } else {
+    prompt = `Analyze the following code for logic bugs and edge cases:
+
+File: ${context.fileName}
+Language: ${context.language}
+
+Code:
+\`\`\`${context.language}
+${context.changedCode}
+\`\`\`
+
+Focus on bugs that would cause runtime errors or incorrect behavior.
+Provide a detailed report of your findings.`;
+    logger.debug(`[Logic Agent] Using BASIC context for ${context.fileName}`);
+  }
+
+  try {
+    const streamOptions: any = {
+      modelSettings: {
+        temperature: 0.5,
+        // Enable reasoning for models that support it
+        // This works for o1/o3 style models
+        reasoningEffort: "high",
+      },
+      structuredOutput: {
+        schema: LogicIssuesResponseSchema,
+        errorStrategy: "warn",
+        jsonPromptInjection: true,
+      },
+    };
+
+    if (clientTools && Object.keys(clientTools).length > 0) {
+      streamOptions.clientTools = clientTools;
+    }
+
+    // Use streaming
+    const streamResult = await agent.stream(prompt, streamOptions);
+
+    let fullText = "";
+    let fullReasoning = "";
+    let chunkCount = 0;
+    const seenChunkTypes = new Set<string>();
+
+    // Get the readable stream and consume it
+    const reader = streamResult.fullStream.getReader();
+
+    try {
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+
+        // Cast chunk for easier access
+        const c = chunk as any;
+        const chunkType = c.type;
+        chunkCount++;
+        seenChunkTypes.add(chunkType);
+
+        // Log first few chunks in detail for debugging
+        if (process.env.DRIFTAL_DEBUG === "1" && chunkCount <= 5) {
+          logger.debug(
+            `[Logic Agent] Chunk ${chunkCount}:`,
+            JSON.stringify(c, null, 2)
+          );
+        }
+
+        // Data can be in multiple places depending on the chunk type:
+        // - c.value (for text-delta, reasoning-delta)
+        // - c.textDelta (direct text delta)
+        // - c.delta (for some providers)
+        // - c.reasoning (direct reasoning content)
+
+        // Handle reasoning/thinking chunks
+        if (
+          chunkType === "reasoning-delta" ||
+          chunkType === "reasoning" ||
+          chunkType === "thinking-delta" ||
+          chunkType === "reasoning_delta"
+        ) {
+          // Try different locations for reasoning content
+          const delta =
+            c.value || c.textDelta || c.delta || c.reasoning || c.content || "";
+          if (delta) {
+            fullReasoning += delta;
+            logger.debug(`[Logic Agent] Reasoning: ${fullReasoning}`);
+            onStreamEvent({
+              type: "thinking",
+              content: fullReasoning,
+              delta,
+            });
+          }
+        }
+        // Handle text output chunks
+        else if (chunkType === "text-delta") {
+          // Text delta content can be in different places
+          const textDelta = c.value || c.textDelta || c.delta || c.text || "";
+
+          // Check for embedded reasoning
+          const reasoningDelta = c.reasoning || "";
+
+          if (reasoningDelta) {
+            fullReasoning += reasoningDelta;
+            onStreamEvent({
+              type: "thinking",
+              content: fullReasoning,
+              delta: reasoningDelta,
+            });
+          }
+
+          if (textDelta) {
+            fullText += textDelta;
+          }
+        }
+        // Handle step-finish which may contain reasoning summary
+        else if (chunkType === "step-finish" || chunkType === "finish") {
+          const stepReasoning = c.reasoning || c.reasoningText || "";
+          if (stepReasoning && !fullReasoning.includes(stepReasoning)) {
+            fullReasoning += stepReasoning;
+            onStreamEvent({
+              type: "thinking",
+              content: fullReasoning,
+              delta: stepReasoning,
+            });
+          }
+          logger.debug(`[Logic Agent] Step finished`, {
+            hasReasoning: !!stepReasoning,
+          });
+        }
+        // Handle 'object' type chunks - these may contain the actual model response
+        else if (chunkType === "object") {
+          // For object chunks, we might be getting partial JSON or other structured data
+          // Log for debugging but don't treat as text
+          if (process.env.DRIFTAL_DEBUG === "1") {
+            logger.debug(`[Logic Agent] Object chunk received`, {
+              chunk: c.object.issues,
+            });
+          }
+        }
+        // Log other unhandled chunk types for debugging
+        else if (process.env.DRIFTAL_DEBUG === "1") {
+          logger.debug(`[Logic Agent] Unhandled chunk type: ${chunkType}`, {
+            keys: Object.keys(c),
+          });
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Log summary of stream processing
+    logger.debug(`[Logic Agent] Stream summary:`, {
+      totalChunks: chunkCount,
+      chunkTypesFound: Array.from(seenChunkTypes),
+      reasoningCaptured: fullReasoning.length > 0,
+      reasoningLength: fullReasoning.length,
+      textCaptured: fullText.length > 0,
+      textLength: fullText.length,
+    });
+
+    // Get the final output
+    const finalOutput = await streamResult.getFullOutput();
+    const issues = (finalOutput as any)?.object?.issues || [];
+
+    // Try to get reasoning text from the stream result if not captured during streaming
+    if (!fullReasoning) {
+      try {
+        const reasoningText = await streamResult.reasoningText;
+        if (reasoningText) {
+          fullReasoning = reasoningText;
+          // Emit the reasoning as a single event since we didn't stream it
+          onStreamEvent({
+            type: "thinking",
+            content: fullReasoning,
+            delta: fullReasoning,
+          });
+          logger.debug(
+            `[Logic Agent] Got reasoning from streamResult.reasoningText: ${reasoningText.substring(0, 100)}...`
+          );
+        }
+      } catch (e) {
+        // Reasoning not available, that's ok
+        logger.debug(`[Logic Agent] No reasoning available from streamResult`);
+      }
+    }
+
+    await logLLMResponseToFile(context.fileName, "Logic_Report", fullText);
+    await logLLMResponseToFile(
+      context.fileName,
+      "Logic_JSON",
+      JSON.stringify(issues, null, 2)
+    );
+
+    if (issues.length > 0) {
+      const normalizedIssues = issues.map((issue: any) => ({
+        ...issue,
+        confidence: issue.confidence ?? 0.8,
+        type: issue.type || "bug",
+        severity: issue.severity || "medium",
+        tags: issue.tags || [],
+      }));
+      return normalizedIssues;
+    }
+
+    return [];
+  } catch (error: any) {
+    if (error?.message?.includes("Structured output validation failed")) {
+      logger.warn(
+        `[Logic Agent] Structured output validation failed for ${context.fileName}.`
+      );
+    } else {
+      logger.error("Logic analysis streaming failed:", error);
+    }
+    return [];
+  }
 }

@@ -299,7 +299,7 @@ Provide a detailed report of your findings.`;
 
   // Log the full prompt being sent to LLM
   logger.debug(`[Logic Agent] ========== FULL PROMPT TO LLM ==========`);
-  logger.debug(prompt);
+  // logger.debug(prompt);
   logger.debug(
     `[Logic Agent] ========== END PROMPT (${prompt.length} chars) ==========`
   );
@@ -320,10 +320,14 @@ Provide a detailed report of your findings.`;
     // Add clientTools if provided
     if (clientTools && Object.keys(clientTools).length > 0) {
       generateOptions.clientTools = clientTools;
-      logger.debug(`[Logic Agent] Passing ${Object.keys(clientTools).length} tools to generate: ${Object.keys(clientTools).join(", ")}`);
+      logger.debug(
+        `[Logic Agent] Passing ${Object.keys(clientTools).length} tools to generate: ${Object.keys(clientTools).join(", ")}`
+      );
     }
 
     const result = await agent.generate(prompt, generateOptions);
+
+    console.log("this is the result in logic agent", result);
 
     logger.debug("[Logic Agent] Raw Analysis Report:", result.text);
     await logLLMResponseToFile(context.fileName, "Logic_Report", result.text);

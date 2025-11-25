@@ -4,17 +4,11 @@ import { createPerformanceAgent } from "./agents/performance-agent.js";
 import { createLogicAgent } from "./agents/logic-agent.js";
 import { createReviewWorkflow } from "./workflows/review-workflow.js";
 import { ReviewMemory } from "./memory/review-memory.js";
-import { loadAuthTokens } from "../utils/token-manager.js";
 import type { AgentModelConfig } from "./types.js";
 import type { Stack } from "../core/indexer/stack-detector.js";
 import { QueryRouter } from "../core/query/query-router.js";
 import { MossClient } from "../core/indexer/moss-client.js";
-import packageJson from "../../package.json" assert { type: "json" };
 import { logger } from "../utils/logger.js";
-
-const DEFAULT_PROXY_URL =
-  process.env.SCOUT_PROXY_URL || "https://auth.driftal.dev";
-const CLI_VERSION = packageJson.version ?? "dev";
 
 export interface MastraConfig {
   llmConfig: LLMConfig;
@@ -114,60 +108,14 @@ export class MastraReviewOrchestrator {
 
     switch (primary) {
       case "cloud-proxy": {
-        let tokens = await loadAuthTokens();
-        if (!tokens?.accessToken) {
-          throw new Error(
-            "Not authenticated with cloud proxy. Please run 'driftal login'."
-          );
-        }
+        // Import the new cloud proxy SDK provider
+        const { getCloudProxyModel } = await import(
+          "./providers/cloud-proxy-sdk.js"
+        );
 
-        // Check if token is expired and refresh if needed
-        const { isTokenExpired } = await import("../utils/token-manager.js");
-        const { refreshAccessToken } = await import("../utils/auth.js");
-        const { logger } = await import("../utils/logger.js");
-
-        if (isTokenExpired(tokens)) {
-          if (tokens.refreshToken) {
-            logger.debug(
-              "Token expired, refreshing before Mastra model config..."
-            );
-            const refreshResult = await refreshAccessToken(tokens.refreshToken);
-            if (refreshResult.success && refreshResult.tokens) {
-              tokens = refreshResult.tokens;
-              logger.debug("Token refreshed successfully");
-            } else {
-              throw new Error(
-                "Token expired and refresh failed. Please run 'driftal login' to re-authenticate."
-              );
-            }
-          } else {
-            throw new Error(
-              "Token expired and no refresh token available. Please run 'driftal login' to re-authenticate."
-            );
-          }
-        }
-
-        const proxyUrl =
-          llmConfig.providers.cloudProxy?.proxyUrl || DEFAULT_PROXY_URL;
-        // Mastra/Vercel AI SDK appends /chat/completions to the URL,
-        // so we need to include /v1 in the base URL to get /v1/chat/completions
-        const baseUrl = proxyUrl.endsWith("/")
-          ? `${proxyUrl}v1`
-          : `${proxyUrl}/v1`;
-        const selectedModel = tokens.selectedModels?.primary || "openai/o3";
-        const { providerId, modelId } =
-          this.parseModelIdentifier(selectedModel);
-
-        logger.debug(modelId, baseUrl, "this is the model being used");
-        return {
-          id: modelId, // Use the full model ID (already includes provider prefix)
-          url: baseUrl,
-          apiKey: tokens.accessToken,
-          headers: {
-            Authorization: `Bearer ${tokens.accessToken}`,
-            "X-Driftal-CLI-Version": `driftal/${CLI_VERSION}`,
-          },
-        };
+        // Return a LanguageModelV2 instance directly
+        // This ensures Mastra calls CloudProxyProvider instead of making direct HTTP requests
+        return await getCloudProxyModel();
       }
       case "anthropic": {
         const model =
@@ -192,37 +140,6 @@ export class MastraReviewOrchestrator {
           `Unsupported primary provider '${primary}' for Mastra integration.`
         );
     }
-  }
-
-  private parseModelIdentifier(modelId: string): {
-    providerId: string;
-    modelId: string;
-  } {
-    if (!modelId.includes("/")) {
-      // Handle models without provider prefix
-      let providerId = "openai"; // default
-
-      if (modelId.startsWith("claude")) {
-        providerId = "anthropic";
-      } else if (modelId.startsWith("gpt-") || modelId.startsWith("o1-") || modelId.startsWith("o3-") || modelId.startsWith("o4-")) {
-        providerId = "openai";
-      } else if (modelId.startsWith("gemini")) {
-        providerId = "gemini";
-      }
-
-      // Return model ID WITH provider prefix
-      return {
-        providerId,
-        modelId: `${providerId}/${modelId}`
-      };
-    }
-
-    const [providerId, ...rest] = modelId.split("/");
-    logger.debug(providerId, rest, "this is the providerId and rest being parsed", modelId);
-    return {
-      providerId: providerId || "openai",
-      modelId: modelId, // Keep the full model ID with provider prefix
-    };
   }
 
   /**

@@ -1,5 +1,8 @@
+import type { LanguageModelV2 } from "@ai-sdk/provider-v5";
+
 export type AgentModelConfig =
   | string
+  | LanguageModelV2
   | {
       id: string;
       url?: string;

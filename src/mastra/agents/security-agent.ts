@@ -307,7 +307,7 @@ Provide a detailed report of your findings.`;
 
   // Log the full prompt being sent to LLM
   logger.debug(`[Security Agent] ========== FULL PROMPT TO LLM ==========`);
-  logger.debug(prompt);
+  // logger.debug(prompt);
   logger.debug(
     `[Security Agent] ========== END PROMPT (${prompt.length} chars) ==========`
   );

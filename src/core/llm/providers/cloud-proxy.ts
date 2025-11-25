@@ -270,6 +270,8 @@ export class CloudProxyProvider extends LLMProvider {
     );
     const data = await response.json();
 
+    console.log("this is the data in cloud proxy", data);
+
     // Handle OpenAI-style response format
     if (data.choices && data.choices.length > 0) {
       const choice = data.choices[0];
@@ -336,6 +338,8 @@ export class CloudProxyProvider extends LLMProvider {
       requestBody,
       true
     );
+
+    console.log("this is the response in cloud proxy", response);
 
     if (!response.body) {
       throw new Error("No response body for streaming");

@@ -616,19 +616,19 @@ export const runAllAgentsInParallelStep = createStep({
     logger.info("[Workflow] Starting parallel execution of all agents");
     const startTime = Date.now();
 
-    const [securityIssues, performanceIssues, logicIssues] = await Promise.all([
-      runAgentOnFiles(
-        createSecurityAgent,
-        "Security",
-        "security",
-        runSecurityAnalysisWithContext
-      ),
-      runAgentOnFiles(
-        createPerformanceAgent,
-        "Performance",
-        "performance",
-        runPerformanceAnalysisWithContext
-      ),
+    const [logicIssues] = await Promise.all([
+      // runAgentOnFiles(
+      //   createSecurityAgent,
+      //   "Security",
+      //   "security",
+      //   runSecurityAnalysisWithContext
+      // ),
+      // runAgentOnFiles(
+      //   createPerformanceAgent,
+      //   "Performance",
+      //   "performance",
+      //   runPerformanceAnalysisWithContext
+      // ),
       runAgentOnFiles(
         createLogicAgent,
         "Logic",
@@ -640,15 +640,13 @@ export const runAllAgentsInParallelStep = createStep({
     const duration = Date.now() - startTime;
     logger.info(
       `[Workflow] Parallel agent execution complete in ${duration}ms: ` +
-        `Security: ${securityIssues.length} issues, ` +
-        `Performance: ${performanceIssues.length} issues, ` +
         `Logic: ${logicIssues.length} issues`
     );
 
     return {
       ...inputData,
-      securityIssues,
-      performanceIssues,
+      // securityIssues,
+      // performanceIssues,
       logicIssues,
     };
   },

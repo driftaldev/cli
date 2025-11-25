@@ -1,3 +1,5 @@
+import path from "path";
+import { readFileSync } from "fs";
 import { getAuthStatus } from "../../utils/token-manager.js";
 
 /**
@@ -21,11 +23,15 @@ export async function getCurrentModel(): Promise<string | undefined> {
 
 /**
  * Get the version from package.json
- * For now, this returns a hardcoded value as requested
  * @returns Version string
  */
 export function getVersion(): string {
-  return "0.0.1";
+  const packageJson = readFileSync(
+    path.join(__dirname, "../../../package.json"),
+    "utf8"
+  );
+  const packageData = JSON.parse(packageJson);
+  return packageData.version;
 }
 
 /**

@@ -1,6 +1,6 @@
 {
   "name": "driftal",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Driftal CLI and MCP server for local first, blazing-fast code review",
   "type": "module",
   "license": "MIT",
@@ -63,10 +63,6 @@
     "prompts": "^2.4.2",
     "react": "^18.3.1",
     "simple-git": "^3.22.0",
-    "tree-sitter": "^0.25.0",
-    "tree-sitter-go": "^0.25.0",
-    "tree-sitter-python": "^0.25.0",
-    "tree-sitter-rust": "^0.24.0",
     "undici": "^6.19.8",
     "web-tree-sitter": "^0.25.10",
     "zod": "^3.22.4"
@@ -77,6 +73,13 @@
     "@types/prompts": "^2.4.9",
     "@types/react": "^18.3.11",
     "react-devtools-core": "^4.28.5",
+    "tree-sitter": "^0.25.0",
+    "tree-sitter-go": "^0.25.0",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-rust": "^0.24.0",
     "typescript": "^5.4.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

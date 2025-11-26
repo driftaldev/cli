@@ -7,40 +7,72 @@ const SECURITY_PROMPTS: Record<Stack, string> = {
 
 Pay special attention to:
 
-1. **Environment Variable Exposure**
-   - Check for accidental logging of process.env or sensitive config
-   - Verify .env files are properly gitignored
-   - Look for hardcoded secrets or API keys
+1. **Logging & Secret Exposure (HIGHEST PRIORITY)**
 
-2. **Prototype Pollution**
+   **Systematically review EVERY logging statement:**
+   - Check ALL: console.log(), console.error(), console.warn(), console.debug()
+   - Check ALL logger: logger.info(), logger.debug(), logger.warn(), logger.error()
+
+   **Flag these CRITICAL patterns:**
+
+   // HARDCODED SECRETS IN LOGS - MUST DETECT:
+   console.log("API key:", "sk-abc123def456");           // Line 68 in redis-cache.ts
+   logger.info("Bearer token: bearer_xyz789");
+   console.debug("Password:", "MySecretPass123");
+   logger.error("Failed:", { apiKey: "pk-live-123" });
+
+   // SENSITIVE VARIABLES LOGGED:
+   const apiKey = getApiKey();
+   console.log("Using key:", apiKey);                    // Variable exposure
+   logger.debug("Token:", authToken);
+
+   // ENVIRONMENT EXPOSURE:
+   console.log(process.env);                             // Full env leaked
+   logger.debug(JSON.stringify(process.env));
+   logger.info("Config:", config);                       // May contain secrets
+
+   **Patterns to recognize as secrets:**
+   - Strings starting with: sk-, pk-, api_key_, bearer_, token_, secret_
+   - Long alphanumeric strings (20+ chars): "a1b2c3d4e5f6g7h8i9j0k1l2"
+   - Variable names: password, secret, apiKey, privateKey, token, credential
+
+   **Safe alternatives to suggest:**
+
+   // SAFE - Redacted:
+   console.log("API key:", apiKey.substring(0, 7) + "...");
+   logger.info("Token length:", token.length);
+   logger.debug("Auth successful");  // No sensitive data
+
+2. **Environment Variable Exposure**
+   - Verify .env files are gitignored (not usually visible in diffs)
+   - Check for process.env access in client-side code
+
+3. **Prototype Pollution**
    - Flag unsafe object merging (Object.assign, spread with user input)
    - Check for lodash vulnerabilities (merge, set, defaultsDeep)
    - Verify JSON.parse input validation
 
-3. **Code Injection**
-   - Never use eval(), Function() constructor, or vm.runInNewContext() with user input
+4. **Code Injection**
+   - Never use eval(), Function() constructor with user input
    - Flag template literal injection risks
    - Check for command injection in child_process.exec()
 
-4. **Dependency Vulnerabilities**
+5. **Dependency Vulnerabilities**
    - Flag outdated or vulnerable packages
    - Check for typosquatting in package names
-   - Verify integrity checks (package-lock.json)
 
-5. **Authentication & Sessions**
+6. **Authentication & Sessions**
    - Verify JWT secrets are strong and env-based
    - Check session cookie flags (httpOnly, secure, sameSite)
-   - Look for weak password validation
 
-6. **Next.js Specific**
+7. **Next.js Specific**
    - Check API routes for proper authentication
    - Verify getServerSideProps doesn't leak sensitive data
-   - Review middleware for security headers
 
-7. **React Specific**
+8. **React Specific**
    - Flag dangerouslySetInnerHTML without sanitization
    - Check for XSS in user-generated content
-   - Verify proper CSRF protection in forms`,
+`,
 
   python: `
 ## Python Security Considerations

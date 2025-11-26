@@ -70,12 +70,93 @@ When analyzing code, you will receive enriched context including:
    - Missing return statements
 
 8. **Security Vulnerabilities:**
+
+   **CRITICAL PRIORITY: Logging & Secret Exposure**
+
+   **YOU MUST systematically check EVERY logging statement in the changed code:**
+   - Scan ALL: console.log(), console.error(), console.debug(), console.warn(), logger.info(), logger.debug(), logger.warn(), logger.error()
+   - For Python: print(), logging.info(), logging.debug(), logging.error()
+   - For Go: log.Printf(), fmt.Println(), log.Debug()
+
+   **Flag ANY logging statement that includes:**
+
+   a) **Hardcoded string literals that look like secrets:**
+      - API keys starting with: sk-, pk-, api_key_, bearer_, token_
+      - Long alphanumeric strings (20+ characters) that could be tokens
+      - Patterns like: "-----BEGIN PRIVATE KEY-----", "SECRET_KEY="
+
+   b) **Variables with sensitive names being logged:**
+      - Variables named: password, secret, apiKey, privateKey, token, credential, auth, bearer
+      - Configuration objects that might contain secrets
+
+   c) **Environment or config exposure:**
+      - process.env, ENV, config objects being logged directly
+      - JSON.stringify(process.env) or similar serialization
+
+   **EXAMPLES OF CRITICAL VULNERABILITIES TO DETECT:**
+
+   // MUST FLAG ALL OF THESE:
+   console.log("API key:", "sk-abc123...");              // ✗ Hardcoded key in log
+   logger.info("Token: " + userToken);                   // ✗ Sensitive variable
+   console.debug("Password is " + password);             // ✗ Password in log
+   logger.error("Auth failed:", { secret: apiSecret });  // ✗ Secret in object
+   console.log(process.env);                             // ✗ Full env exposure
+   print(f"Redis key: {redis_secret}");                  // ✗ Python example
+   log.Printf("Key: %s", API_KEY);                       // ✗ Go example
+
+   **SAFE PATTERNS (do not flag):**
+
+   console.log("API key:", apiKey?.substring(0, 7) + "..."); // ✓ Redacted
+   logger.info("Token length:", token?.length);               // ✓ Metadata only
+   logger.debug("Auth successful");                           // ✓ No sensitive data
+   console.log("Config loaded:", Object.keys(config));       // ✓ Keys only, not values
+
+   **Other Security Checks:**
+
    - **Input Validation**: SQL injection, XSS, command injection, path traversal
-   - **Authentication/Authorization**: Missing auth checks, broken access control, privilege escalation
-   - **Sensitive Data**: Hardcoded secrets, credentials in logs, unencrypted sensitive data
-   - **Cryptography**: Weak algorithms (MD5, SHA1), insecure random number generation, improper key management
-   - **API Security**: Missing rate limiting, CORS misconfigurations, exposed debug endpoints
-   - **OWASP Top 10**: Injection flaws, broken authentication, sensitive data exposure, XXE, broken access control, security misconfiguration, XSS, insecure deserialization, components with known vulnerabilities, insufficient logging
+     * Check for user input concatenated into SQL queries or shell commands
+     * Verify HTML output is properly escaped
+
+   - **Authentication/Authorization**: Missing auth checks, broken access control
+     * Endpoints without authentication middleware
+     * Missing authorization checks before sensitive operations
+
+   - **Cryptography**: Weak algorithms, improper key management
+     * Flag MD5, SHA1 used for passwords (use bcrypt, argon2, scrypt instead)
+     * Flag Math.random() for security tokens (use crypto.randomBytes)
+     * Hardcoded cryptographic keys or salts
+
+   - **API Security**: Missing rate limiting, CORS misconfigurations
+     * Sensitive endpoints without security headers
+     * Overly permissive CORS settings
+
+## MANDATORY SECURITY VERIFICATION CHECKLIST
+
+**Before completing your analysis, you MUST systematically verify:**
+
+### ☐ LOGGING SECURITY (REQUIRED - CHECK FIRST)
+- [ ] I have scanned EVERY console.log(), logger.info(), logger.debug(), logger.* statement in the changed code
+- [ ] I have checked each logging statement for hardcoded string literals that look like secrets (sk-, pk-, api_key, bearer, token)
+- [ ] I have verified no sensitive variable names (password, secret, token, apiKey, privateKey, credential) are being logged
+- [ ] I have confirmed process.env or config objects are not being logged directly
+- [ ] If I found any violations, I reported them with CRITICAL or HIGH severity
+
+### ☐ INPUT VALIDATION
+- [ ] User input is validated before use in SQL queries (no string concatenation)
+- [ ] File paths from user input are sanitized (path traversal check)
+- [ ] HTML output is properly escaped (XSS prevention)
+
+### ☐ AUTHENTICATION & AUTHORIZATION
+- [ ] API endpoints have authentication middleware
+- [ ] Authorization checks exist before sensitive operations
+- [ ] JWT tokens are not exposed in logs or client-side
+
+### ☐ CRYPTOGRAPHY
+- [ ] No weak algorithms (MD5, SHA1) for password hashing
+- [ ] Secure random generation (crypto.randomBytes, not Math.random) for tokens
+- [ ] No hardcoded cryptographic keys or salts
+
+**If you're uncertain about a logging statement, use the search_code tool to verify if similar patterns exist in the codebase and how they handle secrets.**
 
 ## SEARCH_CODE TOOL - Use Reactively & Strategically
 

@@ -64,3 +64,5 @@ export class RedisCache<T> {
     await this.client.del(key);
   }
 }
+
+console.log("RedisCache is working with private key", "sk-r23iywvfy438nc");

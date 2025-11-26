@@ -4,7 +4,7 @@ import { getAuthStatus } from "../../utils/token-manager.js";
 
 /**
  * Get the current selected model from auth tokens
- * @returns The primary model name, or undefined if not authenticated or no model selected
+ * @returns The preferred model name, or undefined if not authenticated or no model selected
  */
 export async function getCurrentModel(): Promise<string | undefined> {
   try {
@@ -14,7 +14,10 @@ export async function getCurrentModel(): Promise<string | undefined> {
       return undefined;
     }
 
-    return authStatus.tokens.selectedModels?.primary;
+    return (
+      authStatus.tokens.preferredModel ||
+      authStatus.tokens.selectedModels?.primary
+    );
   } catch (error) {
     // If there's any error reading auth tokens, return undefined
     return undefined;

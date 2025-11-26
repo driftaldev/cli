@@ -57,12 +57,12 @@ export async function loadLLMConfig(
     // User is authenticated via cloud proxy - use cloud proxy mode (tokens persist until manual logout)
     return {
       providers: {
-        primary: "cloud-proxy" as const,
+        provider: "cloud-proxy" as const,
         cloudProxy: {
           enabled: true,
           accessToken: authTokens.accessToken,
           refreshToken: authTokens.refreshToken,
-          selectedModels: authTokens.selectedModels,
+          preferredModel: authTokens.preferredModel,
         },
       },
       rateLimits: baseConfig?.rateLimits || {
@@ -86,7 +86,7 @@ export async function loadLLMConfig(
   if (anthropicKey || openaiKey) {
     return {
       providers: {
-        primary: openaiKey ? "openai" : "anthropic",
+        provider: openaiKey ? "openai" : "anthropic",
         cloudProxy: { enabled: false },
         ...(anthropicKey && {
           anthropic: {

@@ -66,15 +66,12 @@ async function handleWhoami() {
     }
 
     // Model configuration
-    if (status.tokens?.selectedModels) {
+    if (status.tokens?.preferredModel) {
       console.log(
-        `\nPrimary Model: ${chalk.bold(status.tokens.selectedModels.primary || "Not set")}`
+        `\nPreferred Model: ${chalk.bold(status.tokens.preferredModel)}`
       );
-      if (status.tokens.selectedModels.fallback) {
-        console.log(
-          `Fallback Model: ${chalk.bold(status.tokens.selectedModels.fallback)}`
-        );
-      }
+    } else {
+      console.log(`\nPreferred Model: ${chalk.yellow("Not set")}`);
     }
 
     // Token age

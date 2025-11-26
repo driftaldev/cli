@@ -100,9 +100,9 @@ export class MastraReviewOrchestrator {
 
   private async resolveAgentModelConfig(): Promise<AgentModelConfig> {
     const llmConfig = this.config.llmConfig;
-    const primary = llmConfig.providers.primary;
+    const provider = llmConfig.providers.provider;
 
-    switch (primary) {
+    switch (provider) {
       case "cloud-proxy": {
         // Import the new cloud proxy SDK provider
         const { getCloudProxyModel } = await import(
@@ -133,7 +133,7 @@ export class MastraReviewOrchestrator {
       }
       default:
         throw new Error(
-          `Unsupported primary provider '${primary}' for Mastra integration.`
+          `Unsupported provider '${provider}' for Mastra integration.`
         );
     }
   }

@@ -6,13 +6,15 @@ export interface AuthTokens {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: number;
+  preferredModel?: string;
+  userEmail?: string;
+  createdAt: number;
+  updatedAt: number;
+  // Deprecated
   selectedModels?: {
     primary: string;
     fallback?: string;
   };
-  userEmail?: string;
-  createdAt: number;
-  updatedAt: number;
 }
 
 const AUTH_FILE_NAME = ".driftal/auth.json";
@@ -50,6 +52,11 @@ export async function loadAuthTokens(): Promise<AuthTokens | null> {
       return null;
     }
 
+    // Backwards compatibility: migrate old selectedModels.primary to preferredModel in memory
+    if (data.selectedModels?.primary && !data.preferredModel) {
+      data.preferredModel = data.selectedModels.primary;
+    }
+
     return data;
   } catch (error) {
     // File doesn't exist or is invalid
@@ -73,18 +80,19 @@ export async function saveAuthTokens(tokens: AuthTokens): Promise<void> {
 }
 
 /**
- * Update model preferences without changing tokens
+ * Update model preference without changing tokens
  */
 export async function updateModelPreferences(
-  primary: string,
-  fallback?: string
+  preferredModel: string
 ): Promise<void> {
   const tokens = await loadAuthTokens();
   if (!tokens) {
     throw new Error("No authentication found. Run 'driftal login' first.");
   }
 
-  tokens.selectedModels = { primary, fallback };
+  tokens.preferredModel = preferredModel;
+  // Remove old selectedModels if it exists
+  delete tokens.selectedModels;
   tokens.updatedAt = Date.now();
 
   await saveAuthTokens(tokens);

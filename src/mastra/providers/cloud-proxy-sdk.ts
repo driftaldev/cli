@@ -87,7 +87,10 @@ export async function createCloudProxyProvider() {
 export async function getCloudProxyModel(modelId?: string) {
   const tokens = await loadAuthTokens();
   const selectedModel =
-    modelId || tokens?.selectedModels?.primary || "openai/o3";
+    modelId ||
+    tokens?.preferredModel ||
+    tokens?.selectedModels?.primary ||
+    "gpt-5-codex";
 
   logger.debug("Getting cloud proxy model", { selectedModel });
 

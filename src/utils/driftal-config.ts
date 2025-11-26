@@ -13,14 +13,15 @@ const DRIFTAL_DIR = path.join(os.homedir(), '.driftal');
 const CONFIG_FILE = path.join(DRIFTAL_DIR, 'config.json');
 
 export interface DriftalConfig {
+  preferredModel?: string;
+  lastUpdated?: string;
+  // Deprecated
   primaryModel?: string;
   fallbackModel?: string;
-  lastUpdated?: string;
 }
 
 const DEFAULT_CONFIG: DriftalConfig = {
-  primaryModel: 'claude-3-5-sonnet-20241022',
-  fallbackModel: undefined,
+  preferredModel: 'gpt-5-codex',
 };
 
 /**
@@ -53,8 +54,13 @@ export function loadConfig(): DriftalConfig {
     const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const config = JSON.parse(data) as DriftalConfig;
 
+    // Backwards compatibility: migrate old primaryModel to preferredModel in memory
+    if (config.primaryModel && !config.preferredModel) {
+      config.preferredModel = config.primaryModel;
+    }
+
     logger.debug('Loaded config from ~/.driftal/config.json', {
-      primaryModel: config.primaryModel
+      preferredModel: config.preferredModel
     });
 
     return { ...DEFAULT_CONFIG, ...config };
@@ -83,7 +89,7 @@ export function saveConfig(config: DriftalConfig): void {
     );
 
     logger.debug('Saved config to ~/.driftal/config.json', {
-      primaryModel: config.primaryModel
+      preferredModel: config.preferredModel
     });
   } catch (error) {
     logger.error('Failed to save config', { error });
@@ -92,34 +98,25 @@ export function saveConfig(config: DriftalConfig): void {
 }
 
 /**
- * Get the primary model from config
+ * Get the preferred model from config
  */
-export function getPrimaryModel(): string {
+export function getPreferredModel(): string {
   const config = loadConfig();
-  return config.primaryModel || DEFAULT_CONFIG.primaryModel!;
+  return config.preferredModel || DEFAULT_CONFIG.preferredModel!;
 }
 
 /**
- * Get the fallback model from config
+ * Set model preference in config
  */
-export function getFallbackModel(): string | undefined {
+export function setModelPreference(preferredModel: string): void {
   const config = loadConfig();
-  return config.fallbackModel;
-}
-
-/**
- * Set model preferences in config
- */
-export function setModelPreferences(
-  primaryModel: string,
-  fallbackModel?: string
-): void {
-  const config = loadConfig();
-  config.primaryModel = primaryModel;
-  config.fallbackModel = fallbackModel;
+  config.preferredModel = preferredModel;
+  // Remove deprecated fields when saving
+  delete config.primaryModel;
+  delete config.fallbackModel;
   saveConfig(config);
 
-  logger.info('Model preferences updated', { primaryModel, fallbackModel });
+  logger.info('Model preference updated', { preferredModel });
 }
 
 /**

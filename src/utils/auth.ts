@@ -177,10 +177,7 @@ async function startCallbackServer(state: string): Promise<{
           userEmail: tokenData.user_email,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          selectedModels: {
-            primary: "o3",
-            fallback: "gpt-5.1",
-          },
+          preferredModel: "gpt-5-codex",
         };
 
         // Log token details for debugging

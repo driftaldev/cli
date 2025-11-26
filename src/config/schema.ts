@@ -13,12 +13,7 @@ export const CloudProxyConfigSchema = z.object({
   proxyUrl: z.string().url().optional(),
   accessToken: z.string().optional(),
   refreshToken: z.string().optional(),
-  selectedModels: z
-    .object({
-      primary: z.string(),
-      fallback: z.string().optional(),
-    })
-    .optional(),
+  preferredModel: z.string().optional(),
 });
 
 // LLM Provider Configuration
@@ -27,10 +22,9 @@ export const LLMProviderConfigSchema = z.object({
   cloudProxy: CloudProxyConfigSchema.default({ enabled: true }),
 
   // Traditional provider config (for advanced users with their own API keys)
-  primary: z
+  provider: z
     .enum(["anthropic", "openai", "gemini", "ollama", "openrouter", "cloud-proxy"])
     .default("cloud-proxy"),
-  fallback: z.enum(["anthropic", "openai", "gemini", "ollama", "openrouter"]).optional(),
   anthropic: z
     .object({
       apiKey: z.string().optional(),

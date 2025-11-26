@@ -15,7 +15,7 @@ export class ProviderFactory {
    * Get or create a provider instance
    */
   static getProvider(config: LLMConfig, providerName?: string): LLMProvider {
-    const name = providerName || config.providers.primary;
+    const name = providerName || config.providers.provider;
     const cacheKey = `${name}`;
 
     // Return cached provider if exists
@@ -65,54 +65,6 @@ export class ProviderFactory {
     }
   }
 
-  /**
-   * Get provider with fallback chain
-   */
-  static async getProviderWithFallback(
-    config: LLMConfig
-  ): Promise<LLMProvider> {
-    const primaryProvider = config.providers.primary;
-
-    try {
-      const provider = this.getProvider(config, primaryProvider);
-      // Test if provider is available
-      await this.testProvider(provider);
-      return provider;
-    } catch (error) {
-      logger.warn(`Primary provider ${primaryProvider} failed:`, error);
-
-      // Try fallback if configured
-      if (config.providers.fallback) {
-        try {
-          const fallbackProvider = this.getProvider(
-            config,
-            config.providers.fallback
-          );
-          await this.testProvider(fallbackProvider);
-          logger.info(`Using fallback provider: ${config.providers.fallback}`);
-          return fallbackProvider;
-        } catch (fallbackError) {
-          logger.error(
-            `Fallback provider ${config.providers.fallback} failed:`,
-            fallbackError
-          );
-        }
-      }
-
-      throw new Error(`All providers failed. Last error: ${error}`);
-    }
-  }
-
-  /**
-   * Test if a provider is available
-   */
-  private static async testProvider(provider: LLMProvider): Promise<void> {
-    // Simple test to check if provider is accessible
-    // This could be expanded to do a health check API call
-    if (!provider) {
-      throw new Error("Provider not initialized");
-    }
-  }
 
   /**
    * Clear cached providers

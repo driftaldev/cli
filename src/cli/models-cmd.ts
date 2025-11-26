@@ -29,36 +29,25 @@ async function handleModelsList() {
     const models = await fetchSupportedModels();
     const modelsMap = new Map(models.map((m) => [m.id, m]));
 
-    const primary = status.tokens?.selectedModels?.primary;
-    const fallback = status.tokens?.selectedModels?.fallback;
+    const preferred = status.tokens?.preferredModel;
 
     console.log(chalk.cyan("\nCurrent Model Configuration\n"));
 
-    if (primary) {
-      const primaryInfo = modelsMap.get(primary);
-      console.log(`Primary: ${chalk.bold(primaryInfo?.name || primary)}`);
-      if (primaryInfo?.description) {
-        console.log(chalk.gray(`  ${primaryInfo.description}`));
+    if (preferred) {
+      const preferredInfo = modelsMap.get(preferred);
+      console.log(
+        `Preferred Model: ${chalk.bold(preferredInfo?.name || preferred)}`
+      );
+      if (preferredInfo?.description) {
+        console.log(chalk.gray(`  ${preferredInfo.description}`));
       }
     } else {
-      console.log(chalk.yellow("Primary: Not set"));
-    }
-
-    console.log();
-
-    if (fallback) {
-      const fallbackInfo = modelsMap.get(fallback);
-      console.log(`Fallback: ${chalk.bold(fallbackInfo?.name || fallback)}`);
-      if (fallbackInfo?.description) {
-        console.log(chalk.gray(`  ${fallbackInfo.description}`));
-      }
-    } else {
-      console.log("Fallback: None");
+      console.log(chalk.yellow("Preferred Model: Not set"));
     }
 
     console.log(
       chalk.gray(
-        `\nTo change models, run: ${chalk.bold("driftal models select")}\n`
+        `\nTo change your preferred model, run: ${chalk.bold("driftal models select")}\n`
       )
     );
   } catch (error) {
@@ -87,8 +76,7 @@ async function handleModelsSelect() {
     const models = await fetchSupportedModels();
     const modelsMap = new Map(models.map((m) => [m.id, m]));
 
-    const currentPrimary = status.tokens?.selectedModels?.primary;
-    const currentFallback = status.tokens?.selectedModels?.fallback;
+    const currentPreferred = status.tokens?.preferredModel;
 
     if (models.length === 0) {
       console.log(chalk.yellow("No models available."));
@@ -100,73 +88,36 @@ async function handleModelsSelect() {
       value: model.id,
     }));
 
-    console.log(chalk.cyan("\nUpdate Model Selection\n"));
+    console.log(chalk.cyan("\nSelect Preferred Model\n"));
 
-    // Select primary model
-    const foundPrimaryIndex = currentPrimary
-      ? choices.findIndex((c) => c.value === currentPrimary)
+    // Find current preferred model in choices
+    const foundPreferredIndex = currentPreferred
+      ? choices.findIndex((c) => c.value === currentPreferred)
       : -1;
-    const initialPrimary = foundPrimaryIndex >= 0 ? foundPrimaryIndex : 0;
+    const initialPreferred = foundPreferredIndex >= 0 ? foundPreferredIndex : 0;
 
-    const primaryResponse = await prompts({
+    const modelResponse = await prompts({
       type: "select",
-      name: "primary",
-      message: "Select your primary model:",
+      name: "preferred",
+      message: "Select your preferred model:",
       choices,
-      initial: initialPrimary,
+      initial: initialPreferred,
     });
 
-    if (!primaryResponse.primary) {
+    if (!modelResponse.preferred) {
       logger.warn("Selection cancelled.");
       return;
     }
 
-    // Ask about fallback
-    const wantsFallback = await prompts({
-      type: "confirm",
-      name: "value",
-      message: "Would you like to configure a fallback model?",
-      initial: !!currentFallback,
-    });
-
-    let fallback: string | undefined;
-
-    if (wantsFallback.value) {
-      const fallbackChoices = choices.filter(
-        (c) => c.value !== primaryResponse.primary
-      );
-      const foundFallbackIndex = currentFallback
-        ? fallbackChoices.findIndex((c) => c.value === currentFallback)
-        : -1;
-      const initialFallback = foundFallbackIndex >= 0 ? foundFallbackIndex : 0;
-
-      const fallbackResponse = await prompts({
-        type: "select",
-        name: "fallback",
-        message: "Select your fallback model:",
-        choices: fallbackChoices,
-        initial: initialFallback,
-      });
-
-      fallback = fallbackResponse.fallback;
-    }
-
     // Save the selection
-    await updateModelPreferences(primaryResponse.primary, fallback);
+    await updateModelPreferences(modelResponse.preferred);
 
-    const primaryInfo = modelsMap.get(primaryResponse.primary);
+    const preferredInfo = modelsMap.get(modelResponse.preferred);
 
-    console.log(chalk.green("\n✅ Model preferences updated!\n"));
+    console.log(chalk.green("\n✅ Model preference updated!\n"));
     console.log(
-      `Primary: ${chalk.bold(primaryInfo?.name || primaryResponse.primary)}`
+      `Preferred Model: ${chalk.bold(preferredInfo?.name || modelResponse.preferred)}`
     );
-
-    if (fallback) {
-      const fallbackInfo = modelsMap.get(fallback);
-      console.log(`Fallback: ${chalk.bold(fallbackInfo?.name || fallback)}`);
-    } else {
-      console.log("Fallback: None");
-    }
 
     console.log();
   } catch (error) {

@@ -19,9 +19,9 @@ npm install -g driftal
 
 ## Quick Start With 2 Simple Steps
 
-1. **Initialize Driftal** in your project root:
+1. **Login globally** to get started with any repo on your machine:
    ```bash
-   driftal init
+   driftal login
    ```
 
 2. **Run a review** to analyze your codebase:

@@ -786,12 +786,13 @@ export function createReviewCommand(): Command {
           formatter.format(results);
         }
 
-        // Log review to backend (async, non-blocking)
         const tokens = await loadAuthTokens();
         if (tokens && tokens.userEmail) {
-          logReviewToBackend(results, tokens.userEmail).catch((err) => {
+          try {
+            await logReviewToBackend(results, tokens.userEmail);
+          } catch (err) {
             logger.debug("Failed to log review to backend", { error: err });
-          });
+          }
         }
 
         // Show similar issues if requested

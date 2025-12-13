@@ -29,12 +29,7 @@ export async function getCurrentModel(): Promise<string | undefined> {
  * @returns Version string
  */
 export function getVersion(): string {
-  const packageJson = readFileSync(
-    path.join(__dirname, "../../../package.json"),
-    "utf8"
-  );
-  const packageData = JSON.parse(packageJson);
-  return packageData.version;
+  return "0.1.7";
 }
 
 /**

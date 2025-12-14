@@ -359,6 +359,7 @@ export async function refreshAccessToken(
       expiresAt: data.expires_in
         ? Date.now() + data.expires_in * 1000
         : undefined,
+      preferredModel: existingTokens?.preferredModel,
       selectedModels: existingTokens?.selectedModels,
       userEmail: existingTokens?.userEmail,
       createdAt: existingTokens?.createdAt || Date.now(),

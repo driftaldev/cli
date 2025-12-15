@@ -755,6 +755,16 @@ export function createReviewCommand(): Command {
             })
           );
 
+          const tokens = await loadAuthTokens();
+          logger.debug("Logging review to backend", { tokens });
+          if (tokens && tokens.userEmail) {
+            try {
+              await logReviewToBackend(reviewResults, tokens.userEmail);
+            } catch (err) {
+              logger.debug("Failed to log review to backend", { error: err });
+            }
+          }
+
           await app.waitUntilExit();
         } else {
           // Non-TTY mode - use spinner
@@ -784,14 +794,15 @@ export function createReviewCommand(): Command {
           );
 
           formatter.format(results);
-        }
 
-        const tokens = await loadAuthTokens();
-        if (tokens && tokens.userEmail) {
-          try {
-            await logReviewToBackend(results, tokens.userEmail);
-          } catch (err) {
-            logger.debug("Failed to log review to backend", { error: err });
+          // Log review to backend immediately after displaying results
+          const tokens = await loadAuthTokens();
+          if (tokens && tokens.userEmail) {
+            try {
+              await logReviewToBackend(results, tokens.userEmail);
+            } catch (err) {
+              logger.debug("Failed to log review to backend", { error: err });
+            }
           }
         }
 

@@ -588,6 +588,11 @@ Provide a detailed report of your findings.`;
     let fullReasoning = "";
     let chunkCount = 0;
     const seenChunkTypes = new Set<string>();
+    let capturedUsage: TokenUsage = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    };
 
     // Get the readable stream and consume it
     const reader = streamResult.fullStream.getReader();
@@ -602,6 +607,19 @@ Provide a detailed report of your findings.`;
         const chunkType = c.type;
         chunkCount++;
         seenChunkTypes.add(chunkType);
+
+        // Check for usage in chunks
+        if (c.usage) {
+          capturedUsage = {
+            promptTokens: c.usage.promptTokens ?? 0,
+            completionTokens: c.usage.completionTokens ?? 0,
+            totalTokens: c.usage.totalTokens ?? 0,
+          };
+          logger.debug(
+            "[Logic Agent Streaming] Captured usage from chunk:",
+            capturedUsage
+          );
+        }
 
         // Log first few chunks in detail for debugging
         if (process.env.DRIFTAL_DEBUG === "1" && chunkCount <= 5) {
@@ -708,14 +726,53 @@ Provide a detailed report of your findings.`;
     const finalOutput = await streamResult.getFullOutput();
     const issues = (finalOutput as any)?.object?.issues || [];
 
-    // Extract usage from stream result
+    // Try to get usage from streamResult.usage (Vercel AI SDK property)
+    let streamUsage: any = null;
+    try {
+      streamUsage = await (streamResult as any).usage;
+      if (streamUsage) {
+        logger.debug(
+          "[Logic Agent Streaming] Got usage from streamResult.usage:",
+          streamUsage
+        );
+      }
+    } catch (e) {
+      logger.debug(
+        "[Logic Agent Streaming] No usage available from streamResult.usage"
+      );
+    }
+    //TODO: Get rid of the multiple fallbacks later
+    // Note: Vercel AI SDK uses inputTokens/outputTokens, our interface uses promptTokens/completionTokens
     const usage: TokenUsage = {
-      promptTokens: (finalOutput as any)?.usage?.promptTokens ?? 0,
-      completionTokens: (finalOutput as any)?.usage?.completionTokens ?? 0,
-      totalTokens: (finalOutput as any)?.usage?.totalTokens ?? 0,
+      promptTokens:
+        streamUsage?.inputTokens ||
+        streamUsage?.promptTokens ||
+        capturedUsage.promptTokens ||
+        (finalOutput as any)?.usage?.promptTokens ||
+        (finalOutput as any)?.usage?.inputTokens ||
+        0,
+      completionTokens:
+        streamUsage?.outputTokens ||
+        streamUsage?.completionTokens ||
+        capturedUsage.completionTokens ||
+        (finalOutput as any)?.usage?.completionTokens ||
+        (finalOutput as any)?.usage?.outputTokens ||
+        0,
+      totalTokens:
+        streamUsage?.totalTokens ||
+        capturedUsage.totalTokens ||
+        (finalOutput as any)?.usage?.totalTokens ||
+        0,
     };
 
-    logger.debug("[Logic Agent Streaming] Token usage:", usage);
+    logger.debug("[Logic Agent Streaming] Token usage:", {
+      usage,
+      sources: {
+        streamResult: streamUsage,
+        chunks: capturedUsage.totalTokens > 0 ? capturedUsage : null,
+        finalOutput: (finalOutput as any)?.usage,
+      },
+    });
     await logLLMResponseToFile(
       context.fileName,
       "Logic_Usage",

@@ -29,6 +29,9 @@ export class CloudProxyProvider extends LLMProvider {
   private proxyUrl: string;
   private timeout: number;
   private tokens: AuthTokens | null = null;
+  private lastStreamUsage:
+    | { promptTokens: number; completionTokens: number; totalTokens: number }
+    | undefined = undefined;
 
   constructor(config?: CloudProxyConfig) {
     super({} as any, "cloud-proxy");
@@ -356,6 +359,9 @@ export class CloudProxyProvider extends LLMProvider {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let capturedUsage:
+      | { promptTokens: number; completionTokens: number; totalTokens: number }
+      | undefined = undefined;
 
     try {
       while (true) {
@@ -387,6 +393,16 @@ export class CloudProxyProvider extends LLMProvider {
               // Handle OpenAI-style streaming
               if (data.choices && data.choices.length > 0) {
                 const delta = data.choices[0].delta;
+
+                // Capture usage from chunks (OpenAI includes in final chunk)
+                if (data.usage) {
+                  capturedUsage = {
+                    promptTokens: data.usage.prompt_tokens || 0,
+                    completionTokens: data.usage.completion_tokens || 0,
+                    totalTokens: data.usage.total_tokens || 0,
+                  };
+                  logger.debug("Captured usage from chunk", capturedUsage);
+                }
 
                 // Handle reasoning/thinking content from reasoning models
                 if (delta?.reasoning) {
@@ -439,6 +455,8 @@ export class CloudProxyProvider extends LLMProvider {
       }
     } finally {
       reader.releaseLock();
+      // Store usage for retrieval by logic agent
+      this.lastStreamUsage = capturedUsage;
     }
   }
 

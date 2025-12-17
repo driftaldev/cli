@@ -149,12 +149,11 @@ export class CodeReviewer {
     // For git diff: additions + deletions gives total lines changed
     const linesOfCodeReviewed = diff.stats.additions + diff.stats.deletions;
 
-    // Get total tokens from workflow result (if available)
-    // The Mastra workflow may aggregate token usage from all LLM calls
+    // Get total tokens from workflow result
     const totalTokens = workflowResult.totalTokens ?? 0;
 
-    // Get model from config
-    const model = this.llmConfig.model || "claude-3-5-sonnet-20241022";
+    // Get model from orchestrator (set during provider initialization)
+    const model = this.mastraOrchestrator?.getModelName() || "unknown";
 
     const results: ReviewResults = {
       issues,

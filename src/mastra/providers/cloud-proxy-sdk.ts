@@ -82,9 +82,12 @@ export async function createCloudProxyProvider() {
 /**
  * Gets a language model from the cloud proxy provider
  * @param modelId - Optional model ID to use. Falls back to selected model in auth.json
- * @returns A LanguageModelV2 instance that Mastra can use
+ * @returns An object containing both the LanguageModelV2 instance and the model name string
  */
-export async function getCloudProxyModel(modelId?: string) {
+export async function getCloudProxyModel(modelId?: string): Promise<{
+  model: ReturnType<Awaited<ReturnType<typeof createCloudProxyProvider>>>;
+  modelName: string;
+}> {
   const tokens = await loadAuthTokens();
   const selectedModel =
     modelId ||
@@ -95,5 +98,8 @@ export async function getCloudProxyModel(modelId?: string) {
   logger.debug("Getting cloud proxy model", { selectedModel });
 
   const provider = await createCloudProxyProvider();
-  return provider(selectedModel);
+  return {
+    model: provider(selectedModel),
+    modelName: selectedModel,
+  };
 }

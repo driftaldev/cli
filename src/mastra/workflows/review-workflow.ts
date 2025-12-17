@@ -15,6 +15,8 @@ import {
   runLogicAnalysisWithContext,
   runLogicAnalysisStreaming,
   createCodeAgent,
+  type LogicAnalysisResult,
+  type TokenUsage,
 } from "../agents/logic-agent.js";
 import type { StreamEventCallback } from "../../ui/types/stream-events.js";
 import {
@@ -431,6 +433,7 @@ export const runAllAgentsInParallelStep = createStep({
   }),
   outputSchema: z.object({
     codeIssues: z.array(z.any()),
+    totalTokens: z.number(),
   }),
   execute: async ({ inputData }) => {
     const {
@@ -460,14 +463,14 @@ export const runAllAgentsInParallelStep = createStep({
         agent: any,
         context: any,
         searchTool?: any
-      ) => Promise<ReviewIssue[]>,
+      ) => Promise<LogicAnalysisResult>,
       streamingAnalysisFn?: (
         agent: any,
         context: any,
         onStreamEvent: StreamEventCallback,
         clientTools?: any
-      ) => Promise<ReviewIssue[]>
-    ): Promise<ReviewIssue[]> => {
+      ) => Promise<LogicAnalysisResult>
+    ): Promise<{ issues: ReviewIssue[]; totalTokens: number }> => {
       const ranker = new RelevanceRanker();
       const strategy = ContextStrategyFactory.getStrategy(strategyType);
 
@@ -603,7 +606,7 @@ export const runAllAgentsInParallelStep = createStep({
                 fileName: file.path,
               });
 
-              const fileIssues = await streamingAnalysisFn(
+              const result = await streamingAnalysisFn(
                 agent,
                 context,
                 onStreamEvent,
@@ -617,33 +620,39 @@ export const runAllAgentsInParallelStep = createStep({
                 fileName: file.path,
               });
 
-              return fileIssues;
+              return result;
             } else {
               // Use non-streaming analysis
-              const fileIssues = await analysisFn(agent, context, clientTools);
-              return fileIssues;
+              const result = await analysisFn(agent, context, clientTools);
+              return result;
             }
           } catch (error) {
             logger.warn(`[${agentName}:${file.path}] Analysis failed:`, error);
-            return [];
+            return { issues: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } };
           }
         })
       );
 
-      // Flatten the array of issue arrays
-      const issues = allIssues.flat();
+      // Aggregate issues and token usage from all file results
+      const issues: ReviewIssue[] = [];
+      let totalTokens = 0;
+
+      for (const result of allIssues) {
+        issues.push(...result.issues);
+        totalTokens += result.usage.totalTokens;
+      }
 
       logger.debug(
-        `[Workflow] ${agentName} agent found ${issues.length} issues`
+        `[Workflow] ${agentName} agent found ${issues.length} issues, used ${totalTokens} tokens`
       );
-      return issues;
+      return { issues, totalTokens };
     };
 
     // Run code analyzer agent
     logger.info("[Workflow] Starting code analysis");
     const startTime = Date.now();
 
-    const codeIssues = await runAgentOnFiles(
+    const codeResult = await runAgentOnFiles(
       createCodeAgent,
       "Code",
       "code",
@@ -654,12 +663,13 @@ export const runAllAgentsInParallelStep = createStep({
     const duration = Date.now() - startTime;
     logger.info(
       `[Workflow] Code analysis complete in ${duration}ms: ` +
-        `${codeIssues.length} issues`
+        `${codeResult.issues.length} issues, ${codeResult.totalTokens} tokens`
     );
 
     return {
       ...inputData,
-      codeIssues,
+      codeIssues: codeResult.issues,
+      totalTokens: codeResult.totalTokens,
     };
   },
 });
@@ -671,15 +681,19 @@ export const synthesizeResultsStep = createStep({
   id: "synthesize-results",
   inputSchema: z.object({
     codeIssues: z.array(z.any()).optional(),
+    totalTokens: z.number().optional(),
   }),
   outputSchema: z.object({
     allIssues: z.array(z.any()),
+    totalTokens: z.number(),
   }),
   execute: async ({ inputData }) => {
     const codeIssues = inputData.codeIssues ?? [];
+    const totalTokens = inputData.totalTokens ?? 0;
 
     logger.debug("[Workflow] Synthesize step received:");
     logger.debug("  Code issues:", codeIssues.length);
+    logger.debug("  Total tokens:", totalTokens);
 
     // Use code issues directly
     const allIssues = [...codeIssues];
@@ -689,6 +703,7 @@ export const synthesizeResultsStep = createStep({
     return {
       ...inputData,
       allIssues,
+      totalTokens,
     };
   },
 });
@@ -700,6 +715,7 @@ export const rankIssuesStep = createStep({
   id: "rank-issues",
   inputSchema: z.object({
     allIssues: z.array(z.any()).optional(),
+    totalTokens: z.number().optional(),
     issueRanker: z.any().optional(),
     minConfidence: z.number().optional(),
     severityFilter: z.string().optional(),
@@ -712,9 +728,11 @@ export const rankIssuesStep = createStep({
   }),
   outputSchema: z.object({
     rankedIssues: z.array(z.any()),
+    totalTokens: z.number(),
   }),
   execute: async ({ inputData }) => {
     const allIssues = inputData.allIssues ?? [];
+    const totalTokens = inputData.totalTokens ?? 0;
     const issueRanker = inputData.issueRanker;
     const minConfidence =
       inputData.minConfidence ?? inputData.options?.minConfidence ?? 0.5;
@@ -724,12 +742,14 @@ export const rankIssuesStep = createStep({
     logger.debug("[Workflow] Rank step received", allIssues.length, "issues");
     logger.debug("[Workflow] Min confidence:", minConfidence);
     logger.debug("[Workflow] Severity filter:", severityFilter);
+    logger.debug("[Workflow] Total tokens:", totalTokens);
 
     if (!issueRanker) {
       logger.debug("[Workflow] No issue ranker, returning all issues");
       return {
         ...inputData,
         rankedIssues: allIssues,
+        totalTokens,
       };
     }
 
@@ -764,6 +784,7 @@ export const rankIssuesStep = createStep({
     return {
       ...inputData,
       rankedIssues: issues,
+      totalTokens,
     };
   },
 });

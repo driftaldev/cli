@@ -25,6 +25,7 @@ export class MastraReviewOrchestrator {
   private memory: ReviewMemory;
   private initialized: boolean = false;
   private modelConfig?: AgentModelConfig;
+  private modelName?: string;
   private _queryRouter?: QueryRouter;
 
   // Agent (combines logic and security analysis)
@@ -109,23 +110,27 @@ export class MastraReviewOrchestrator {
           "./providers/cloud-proxy-sdk.js"
         );
 
-        // Return a LanguageModelV2 instance directly
-        // This ensures Mastra calls CloudProxyProvider instead of making direct HTTP requests
-        return await getCloudProxyModel();
+        // Get both the model instance and model name
+        const result = await getCloudProxyModel();
+        this.modelName = result.modelName; // Store the actual model name
+        return result.model;
       }
       case "anthropic": {
         const model =
           llmConfig.providers.anthropic?.model || "claude-3-5-sonnet-20241022";
+        this.modelName = model; // Store the model name
         return `anthropic/${model}`;
       }
       case "openai": {
         const model = llmConfig.providers.openai?.model || "gpt-4-turbo";
+        this.modelName = model; // Store the model name
         return `openai/${model}`;
       }
       case "ollama": {
         const baseUrl =
           llmConfig.providers.ollama?.baseUrl || "http://localhost:11434";
         const model = llmConfig.providers.ollama?.model || "codellama";
+        this.modelName = model; // Store the model name
         return {
           id: `ollama/${model}`,
           url: baseUrl,
@@ -157,6 +162,10 @@ export class MastraReviewOrchestrator {
    */
   getModelConfig() {
     return this.modelConfig;
+  }
+
+  getModelName(): string | undefined {
+    return this.modelName;
   }
 
   /**

@@ -332,6 +332,23 @@ export function createCodeAgent(
 export const createLogicAgent = createCodeAgent;
 
 /**
+ * Token usage information from LLM calls
+ */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/**
+ * Result of logic analysis including issues and token usage
+ */
+export interface LogicAnalysisResult {
+  issues: any[];
+  usage: TokenUsage;
+}
+
+/**
  * Run logic analysis using the agent with enriched context
  */
 export async function runLogicAnalysisWithContext(
@@ -340,7 +357,7 @@ export async function runLogicAnalysisWithContext(
     | EnrichedContext
     | { changedCode: string; fileName: string; language: string },
   clientTools?: Record<string, any>
-): Promise<any[]> {
+): Promise<LogicAnalysisResult> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "relatedTests" in context;
 
@@ -433,9 +450,24 @@ Provide a detailed report of your findings.`;
     const result = await agent.generate(prompt, generateOptions);
 
     console.log("this is the result in logic agent", result);
+    console.log("logic agent usage", result.usage);
 
     logger.debug("[Logic Agent] Raw Analysis Report:", result.text);
     await logLLMResponseToFile(context.fileName, "Logic_Report", result.text);
+
+    // Extract usage from result
+    const usage: TokenUsage = {
+      promptTokens: result.usage?.promptTokens ?? 0,
+      completionTokens: result.usage?.completionTokens ?? 0,
+      totalTokens: result.usage?.totalTokens ?? 0,
+    };
+
+    logger.debug("[Logic Agent] Token usage:", usage);
+    await logLLMResponseToFile(
+      context.fileName,
+      "Logic_Usage",
+      JSON.stringify(result, null, 2)
+    );
 
     // Extract issues from structured output
     const issues = result.object?.issues || [];
@@ -457,11 +489,11 @@ Provide a detailed report of your findings.`;
       }));
 
       logger.debug("[Logic Agent] Structured output issues:", normalizedIssues);
-      return normalizedIssues;
+      return { issues: normalizedIssues, usage };
     }
 
     logger.debug("[Logic Agent] No issues found in structured output");
-    return [];
+    return { issues: [], usage };
   } catch (error: any) {
     // Check if this is a structured output validation error
     if (error?.message?.includes("Structured output validation failed")) {
@@ -475,7 +507,10 @@ Provide a detailed report of your findings.`;
       logger.error("Logic analysis failed:", error);
       logger.debug("[Logic Agent] Error details:", error);
     }
-    return [];
+    return {
+      issues: [],
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    };
   }
 }
 
@@ -486,7 +521,7 @@ export async function runLogicAnalysis(
     fileName: string;
     language: string;
   }
-): Promise<any[]> {
+): Promise<LogicAnalysisResult> {
   return runLogicAnalysisWithContext(agent, context);
 }
 
@@ -501,7 +536,7 @@ export async function runLogicAnalysisStreaming(
     | { changedCode: string; fileName: string; language: string },
   onStreamEvent: StreamEventCallback,
   clientTools?: Record<string, any>
-): Promise<any[]> {
+): Promise<LogicAnalysisResult> {
   // Check if this is enriched context
   const isEnriched = "imports" in context || "relatedTests" in context;
 
@@ -673,6 +708,20 @@ Provide a detailed report of your findings.`;
     const finalOutput = await streamResult.getFullOutput();
     const issues = (finalOutput as any)?.object?.issues || [];
 
+    // Extract usage from stream result
+    const usage: TokenUsage = {
+      promptTokens: (finalOutput as any)?.usage?.promptTokens ?? 0,
+      completionTokens: (finalOutput as any)?.usage?.completionTokens ?? 0,
+      totalTokens: (finalOutput as any)?.usage?.totalTokens ?? 0,
+    };
+
+    logger.debug("[Logic Agent Streaming] Token usage:", usage);
+    await logLLMResponseToFile(
+      context.fileName,
+      "Logic_Usage",
+      JSON.stringify(finalOutput, null, 2)
+    );
+
     // Try to get reasoning text from the stream result if not captured during streaming
     if (!fullReasoning) {
       try {
@@ -710,10 +759,10 @@ Provide a detailed report of your findings.`;
         severity: issue.severity || "medium",
         tags: issue.tags || [],
       }));
-      return normalizedIssues;
+      return { issues: normalizedIssues, usage };
     }
 
-    return [];
+    return { issues: [], usage };
   } catch (error: any) {
     if (error?.message?.includes("Structured output validation failed")) {
       logger.warn(
@@ -722,6 +771,9 @@ Provide a detailed report of your findings.`;
     } else {
       logger.error("Logic analysis streaming failed:", error);
     }
-    return [];
+    return {
+      issues: [],
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    };
   }
 }

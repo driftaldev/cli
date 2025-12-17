@@ -157,7 +157,7 @@ async function logReviewToBackend(
 
     const requestBody = {
       email: userEmail,
-      model: results.model || "claude-3-5-sonnet-20241022",
+      model: results.model || "unknown",
       total_tokens: results.totalTokens || 0,
       lines_of_code_reviewed: results.linesOfCodeReviewed || 0,
       review_duration_ms: results.duration || 0,
